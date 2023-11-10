@@ -18,6 +18,7 @@ type PathInfo struct {
 	Path     string
 	Template string
 	Vars     map[string]string
+	YangPath string
 }
 
 // HasVar checks if the PathInfo contains given variable.
