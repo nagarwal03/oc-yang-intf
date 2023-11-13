@@ -37,6 +37,11 @@ func init() {
 	
 	XlateFuncBind("YangToDb_intf_tbl_key_xfmr", YangToDb_intf_tbl_key_xfmr)
 	XlateFuncBind("DbToYang_intf_tbl_key_xfmr", DbToYang_intf_tbl_key_xfmr)
+
+	XlateFuncBind("YangToDb_intf_eth_port_config_xfmr", YangToDb_intf_eth_port_config_xfmr)
+	XlateFuncBind("DbToYang_intf_eth_port_config_xfmr", DbToYang_intf_eth_port_config_xfmr)
+	
+	XlateFuncBind("DbToYangPath_intf_eth_port_config_path_xfmr", DbToYangPath_intf_eth_port_config_path_xfmr)
 	
 	XlateFuncBind("DbToYang_intf_admin_status_xfmr", DbToYang_intf_admin_status_xfmr)
 
@@ -497,6 +502,580 @@ var DbToYang_intf_tbl_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[
 	res_map["name"] = inParams.key
 	return res_map, nil
 }
+
+// YangToDb_intf_eth_port_config_xfmr handles port-speed, fec, unreliable-los, auto-neg and aggregate-id config.
+var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
+	var err error
+	var lagStr string
+	memMap := make(map[string]map[string]db.Value)
+
+	pathInfo := NewPathInfo(inParams.uri)
+	requestUriPath := (NewPathInfo(inParams.requestUri)).YangPath
+	uriIfName := pathInfo.Var("name")
+	ifName := uriIfName
+
+	sonicIfName := utils.GetNativeNameFromUIName(&uriIfName)
+	log.Infof("YangToDb_intf_eth_port_config_xfmr: Interface name retrieved from alias : %s is %s", ifName, *sonicIfName)
+	ifName = *sonicIfName
+
+	intfType, _, err := getIntfTypeByName(ifName)
+	if err != nil {
+		errStr := "Invalid Interface"
+		err = tlerr.InvalidArgsError{Format: errStr}
+		return nil, err
+	}
+	if IntfTypeVxlan == intfType || IntfTypeVlan == intfType {
+		return memMap, nil
+	}
+
+	intfsObj := getIntfsRoot(inParams.ygRoot)
+	intfObj := intfsObj.Interface[uriIfName]
+
+	// Need to differentiate between config container delete and any attribute other than aggregate-id delete
+	if inParams.oper == DELETE {
+		/* Handles 3 cases
+		   case 1: Deletion request at top-level container / list
+		   case 2: Deletion request at ethernet container level
+		   case 3: Deletion request at ethernet/config container level */
+
+		//case 1
+		if intfObj.Ethernet == nil ||
+			//case 2
+			intfObj.Ethernet.Config == nil ||
+			//case 3
+			(intfObj.Ethernet.Config != nil && requestUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config") {
+
+			// Delete all the Vlans for Interface and member port removal from port-channel
+			lagId, err := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+			if lagId != nil {
+				log.Infof("%s is member of %s", ifName, *lagId)
+			}
+			if err != nil {
+				errStr := "Retrieveing PortChannel associated with Interface: " + ifName + " failed!"
+				return nil, errors.New(errStr)
+			}
+			if lagId != nil {
+				lagStr = *lagId
+				intTbl := IntfTypeTblMap[IntfTypePortChannel]
+				tblName, _ := getMemTableNameByDBId(intTbl, inParams.curDb)
+
+				m := make(map[string]string)
+				value := db.Value{Field: m}
+				m["NULL"] = "NULL"
+				intfKey := lagStr + "|" + ifName
+				if _, ok := memMap[tblName]; !ok {
+					memMap[tblName] = make(map[string]db.Value)
+				}
+				memMap[tblName][intfKey] = value
+			}
+			return memMap, err
+		}
+	}
+
+	/* Handle AggregateId config */
+	if intfObj.Ethernet.Config.AggregateId != nil {
+		if !strings.HasPrefix(ifName, ETHERNET) {
+			return nil, errors.New("Invalid config request")
+		}
+		intTbl := IntfTypeTblMap[IntfTypePortChannel]
+		tblName, _ := getMemTableNameByDBId(intTbl, inParams.curDb)
+
+		switch inParams.oper {
+		case CREATE:
+			fallthrough
+		case REPLACE:
+			fallthrough
+		case UPDATE:
+			log.Info("Add member port")
+			lagId := intfObj.Ethernet.Config.AggregateId
+			lagStr = *lagId
+
+			intfType, _, err := getIntfTypeByName(ifName)
+			if intfType != IntfTypeEthernet || err != nil {
+				intfTypeStr := strconv.Itoa(int(intfType))
+				errStr := "Invalid interface type" + intfTypeStr
+				log.Error(errStr)
+				return nil, tlerr.InvalidArgsError{Format: errStr}
+			}
+			/* Check if PortChannel exists */
+			err = validateIntfExists(inParams.d, intTbl.cfgDb.portTN, lagStr)
+			if err != nil {
+				return nil, err
+			}
+
+		case DELETE:
+			lagId, err := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+			if lagId != nil {
+				log.Infof("%s is member of %s", ifName, *lagId)
+			}
+			if lagId == nil || err != nil {
+				return nil, nil
+			}
+			lagStr = *lagId
+		} /* End of switch case */
+		if len(lagStr) != 0 {
+			m := make(map[string]string)
+			value := db.Value{Field: m}
+			m["NULL"] = "NULL"
+			intfKey := lagStr + "|" + ifName
+			if _, ok := memMap[tblName]; !ok {
+				memMap[tblName] = make(map[string]db.Value)
+			}
+			memMap[tblName][intfKey] = value
+		}
+	}
+	/* Handle PortSpeed config */
+	if intfObj.Ethernet.Config.PortSpeed != 0 {
+		res_map := make(map[string]string)
+		value := db.Value{Field: res_map}
+		intTbl := IntfTypeTblMap[intfType]
+		if isPortGroupMember(ifName) {
+			err = tlerr.InvalidArgs("Port group member. Please use port group command to change the speed")
+		}
+		portSpeed := intfObj.Ethernet.Config.PortSpeed
+		val, ok := intfOCToSpeedMap[portSpeed]
+		if ok {
+			err = validateSpeed(inParams.d, ifName, val)
+			if err == nil {
+				res_map[PORT_SPEED] = val
+				if IntfTypeMgmt != intfType {
+					res_map[PORT_AUTONEG] = "off"
+					res_map["adv_speeds"] = "all"
+					res_map["link_training"] = "off"
+					res_map["unreliable_los"] = "auto"
+				}
+			}
+		} else {
+			err = tlerr.InvalidArgs("Invalid speed %s", val)
+		}
+
+		if err == nil {
+			if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+				memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+			}
+			memMap[intTbl.cfgDb.portTN][ifName] = value
+		}
+	} else if requestUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/port-speed" {
+		if inParams.oper == DELETE {
+			updateMap := make(map[string]map[string]db.Value)
+			intTbl := IntfTypeTblMap[intfType]
+			res_map := make(map[string]string)
+			value := db.Value{Field: res_map}
+			defSpeed := getDefaultSpeed(inParams.d, ifName)
+			log.Info("Default speed for ", ifName, " is ", defSpeed)
+			if defSpeed != 0 {
+				val := strconv.FormatInt(int64(defSpeed), 10)
+				err = validateSpeed(inParams.d, ifName, val)
+				if err == nil {
+					res_map[PORT_SPEED] = val
+				}
+			}
+			if IntfTypeMgmt != intfType {
+				var mode string
+				mode, err = getDefaultAutoNegMode(ifName)
+				if err != nil {
+					mode = "off"
+				}
+				res_map[PORT_AUTONEG] = mode
+				res_map["adv_speeds"] = "all"
+				res_map["link_training"] = "off"
+				res_map["unreliable_los"] = "auto"
+			}
+			if len(res_map) > 0 {
+				if _, ok := updateMap[intTbl.cfgDb.portTN]; !ok {
+					updateMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+				}
+				updateMap[intTbl.cfgDb.portTN][ifName] = value
+				subOpMap := make(map[db.DBNum]map[string]map[string]db.Value)
+				subOpMap[db.ConfigDB] = updateMap
+				inParams.subOpDataMap[UPDATE] = &subOpMap
+			}
+		} else {
+			log.Error("Unexpected oper ", inParams.oper)
+		}
+	}
+	/* Handle Port Duplex Config */
+	duplex, dup_present := yangToDbDuplexModeMap[intfObj.Ethernet.Config.DuplexMode]
+	if dup_present {
+		res_map := make(map[string]string)
+		value := db.Value{Field: res_map}
+		intTbl := IntfTypeTblMap[intfType]
+		log.Info("Validate duplex of %s", duplex)
+		res_map[DUPLEX_MODE] = duplex
+
+		if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+			memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+		}
+		memMap[intTbl.cfgDb.portTN][ifName] = value
+	} else if requestUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/duplex-mode" && inParams.oper == DELETE {
+		res_map := make(map[string]string)
+		value := db.Value{Field: res_map}
+		intTbl := IntfTypeTblMap[intfType]
+		res_map[DUPLEX_MODE] = ""
+
+		if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+			memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+		}
+		memMap[intTbl.cfgDb.portTN][ifName] = value
+	}
+	/* Handle Port FEC config */
+	_, present := yangToDbFecMap[intfObj.Ethernet.Config.PortFec]
+	if present {
+		res_map := make(map[string]string)
+		value := db.Value{Field: res_map}
+		intTbl := IntfTypeTblMap[intfType]
+
+		portFec := intfObj.Ethernet.Config.PortFec
+
+		if inParams.oper == DELETE {
+			/* Delete implies default*/
+			portFec = ocbinds.OpenconfigPlatformTypes_FEC_MODE_TYPE_FEC_AUTO
+		}
+
+		fec_val, ok := yangToDbFecMap[portFec]
+
+		if !ok {
+			err = tlerr.InvalidArgs("Invalid FEC %s", portFec)
+			log.Infof("Did not find FEC entry")
+		} else {
+			/* Need the number of lanes */
+			port_info, err := inParams.d.GetEntry(&db.TableSpec{Name: "PORT"}, db.Key{Comp: []string{ifName}})
+			if err != nil {
+				err = tlerr.NotSupported("Port info not readable")
+				log.Infof("DB not readable when attempting FEC set to %s", fec_val)
+			} else {
+				lane_count := len(strings.Split(port_info.Get(PORT_LANES), ","))
+				port_speed := port_info.Get(PORT_SPEED)
+
+				log.Infof("Will use lane_count: %d, port_speed: %s, ifname: %s to lookup fec value %s", lane_count, port_speed, ifName, fec_val)
+
+				if fec_val == "default" {
+					log.Infof("Default FEC will be used")
+					nativeName := *(utils.GetNativeNameFromName(&ifName))
+					fec_val = common_utils.Get_default_fec(nativeName, lane_count, port_speed)
+					log.Infof("Setting default FEC via DB write %s", fec_val)
+					res_map[PORT_FEC] = fec_val
+				} else {
+					log.Infof("Configured fec of %s", fec_val)
+					res_map[PORT_FEC] = fec_val
+				}
+			}
+			if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+				log.Infof("Creating map entry", fec_val)
+				memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+			}
+			log.Infof("Finishing map assign  %s", fec_val)
+			memMap[intTbl.cfgDb.portTN][ifName] = value
+		}
+	}
+
+	/* Prepare the map to handle multiple entries */
+	res_map := make(map[string]string)
+	value := db.Value{Field: res_map}
+
+	/* Handle AutoNegotiate config */
+	if intfObj.Ethernet.Config.AutoNegotiate != nil {
+		if intfType == IntfTypeMgmt || intfType == IntfTypeEthernet {
+			intTbl := IntfTypeTblMap[intfType]
+			autoNeg := intfObj.Ethernet.Config.AutoNegotiate
+			var enStr string
+			if *autoNeg {
+				if IntfTypeMgmt == intfType {
+					enStr = "true"
+				} else {
+					enStr = "on"
+				}
+			} else {
+				if IntfTypeMgmt == intfType {
+					enStr = "false"
+				} else {
+					enStr = "off"
+				}
+			}
+			res_map[PORT_AUTONEG] = enStr
+
+			if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+				memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+			}
+			memMap[intTbl.cfgDb.portTN][ifName] = value
+		} else {
+			return nil, errors.New("AutoNegotiate config not supported for given Interface type")
+		}
+	}
+
+	/* Handle Link Training config */
+	if intfObj.Ethernet.Config.StandaloneLinkTraining != nil {
+		intTbl := IntfTypeTblMap[intfType]
+		linkTr := intfObj.Ethernet.Config.StandaloneLinkTraining
+		var enStr string
+		if *linkTr {
+			enStr = "on"
+		} else {
+			enStr = "off"
+		}
+		res_map["link_training"] = enStr
+
+		if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+			memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+		}
+		memMap[intTbl.cfgDb.portTN][ifName] = value
+	}
+
+	/* Handle Advertised Speed config */
+	if intfObj.Ethernet.Config.AdvertisedSpeed != nil {
+		intTbl := IntfTypeTblMap[intfType]
+		advspd := intfObj.Ethernet.Config.AdvertisedSpeed
+		if *advspd != "" {
+			res_map["adv_speeds"] = *advspd
+		} else {
+			res_map["adv_speeds"] = "all"
+		}
+
+		if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+			memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+		}
+		memMap[intTbl.cfgDb.portTN][ifName] = value
+	}
+
+	/* Handle Unreliable LOS config */
+	if intfObj.Ethernet.Config.UnreliableLos != ocbinds.OpenconfigIfEthernetExt2_UNRELIABLE_LOS_MODE_TYPE_UNSET {
+		intTbl := IntfTypeTblMap[intfType]
+		unlos := yangToDbLosMap[intfObj.Ethernet.Config.UnreliableLos]
+		res_map["unreliable_los"] = unlos
+
+		if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+			memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+		}
+		memMap[intTbl.cfgDb.portTN][ifName] = value
+	}
+
+	/* Handle diag mode config */
+	_, diag_update := yangToDbDiagMap[intfObj.Ethernet.Config.DiagMode]
+	if diag_update {
+
+		if intfType == IntfTypeMgmt {
+			return nil, errors.New("Diag mode not supported for given Interface type")
+		}
+
+		res_map := make(map[string]string)
+		value := db.Value{Field: res_map}
+		intTbl := IntfTypeTblMap[intfType]
+
+		diagMode := intfObj.Ethernet.Config.DiagMode
+
+		if inParams.oper == DELETE {
+			/* Delete implies default*/
+			diagMode = ocbinds.OpenconfigIfEthernetExt2_DIAG_MODE_TYPE_DIAG_MODE_OFF
+		}
+
+		diag, ok := yangToDbDiagMap[diagMode]
+
+		if !ok {
+			err = tlerr.InvalidArgs("Invalid diag mode %s", diagMode)
+			log.Infof("Did not find diag mode valid entry")
+		} else {
+			res_map[PORT_DIAG_MODE] = diag
+
+			if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+				memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+			}
+			memMap[intTbl.cfgDb.portTN][ifName] = value
+			log.Infof("diag mode set to %s", diag)
+		}
+	}
+
+	/* Handle  */
+	if intfObj.Ethernet.Config.HighWattageOpticsEnable != nil {
+		intTbl := IntfTypeTblMap[intfType]
+		hwoe := intfObj.Ethernet.Config.HighWattageOpticsEnable
+		if *hwoe {
+			res_map["high-wattage-optics-enable"] = "true"
+		} else {
+			res_map["high-wattage-optics-enable"] = "false"
+		}
+		if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+			memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+		}
+		memMap[intTbl.cfgDb.portTN][ifName] = value
+	}
+
+	return memMap, err
+}
+
+// DbToYang_intf_eth_port_config_xfmr is to handle DB to yang translation of port-speed, auto-neg and aggregate-id config.
+var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrParams) error {
+	var err error
+	intfsObj := getIntfsRoot(inParams.ygRoot)
+	pathInfo := NewPathInfo(inParams.uri)
+	uriIfName := pathInfo.Var("name")
+	ifName := uriIfName
+
+	sonicIfName := utils.GetNativeNameFromUIName(&uriIfName)
+	log.Infof("DbToYang_intf_eth_port_config_xfmr: Interface name retrieved from alias : %s is %s", ifName, *sonicIfName)
+	ifName = *sonicIfName
+
+	intfType, _, err := getIntfTypeByName(ifName)
+	if err != nil {
+		errStr := "Invalid Interface"
+		err = tlerr.InvalidArgsError{Format: errStr}
+		return err
+	}
+	if IntfTypeVxlan == intfType {
+		return nil
+	}
+	intTbl := IntfTypeTblMap[intfType]
+	tblName := intTbl.cfgDb.portTN
+	entry, dbErr := inParams.dbs[db.ConfigDB].GetEntry(&db.TableSpec{Name: tblName}, db.Key{Comp: []string{ifName}})
+	if dbErr != nil {
+		errStr := "Invalid Interface"
+		err = tlerr.InvalidArgsError{Format: errStr}
+		return err
+	}
+	targetUriPath := pathInfo.YangPath
+	if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config") {
+		get_cfg_obj := false
+		var intfObj *ocbinds.OpenconfigInterfaces_Interfaces_Interface
+		if intfsObj != nil && intfsObj.Interface != nil && len(intfsObj.Interface) > 0 {
+			var ok bool = false
+			if intfObj, ok = intfsObj.Interface[uriIfName]; !ok {
+				intfObj, _ = intfsObj.NewInterface(uriIfName)
+			}
+			ygot.BuildEmptyTree(intfObj)
+		} else {
+			ygot.BuildEmptyTree(intfsObj)
+			intfObj, _ = intfsObj.NewInterface(uriIfName)
+			ygot.BuildEmptyTree(intfObj)
+		}
+		ygot.BuildEmptyTree(intfObj.Ethernet)
+		ygot.BuildEmptyTree(intfObj.Ethernet.Config)
+
+		if targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config" {
+			get_cfg_obj = true
+		}
+		var errStr string
+		if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id" {
+			is_id_populated := false
+			intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+			if intf_lagId != nil {
+				if strings.HasPrefix(*intf_lagId, "PortChannel") {
+					intfObj.Ethernet.Config.AggregateId = intf_lagId
+					is_id_populated = true
+				}
+			}
+			if !is_id_populated {
+				errStr = "aggregate-id not set"
+			}
+
+			// subscribe for aggregate-id needs "Resource not found" for delete notification
+			if (targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id") && (!is_id_populated) {
+				err = tlerr.NotFoundError{Format: "Resource not found"}
+				return err
+			}
+		}
+
+		if entry.IsPopulated() {
+			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/auto-negotiate" {
+				autoNeg, ok := entry.Field[PORT_AUTONEG]
+				if ok {
+					var oc_auto_neg bool
+					if autoNeg == "on" || autoNeg == "true" {
+						oc_auto_neg = true
+					} else {
+						oc_auto_neg = false
+					}
+					intfObj.Ethernet.Config.AutoNegotiate = &oc_auto_neg
+				} else {
+					errStr = "auto-negotiate not set"
+				}
+			}
+			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/port-speed" {
+				speed, ok := entry.Field[PORT_SPEED]
+				portSpeed := ocbinds.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
+				if ok {
+					portSpeed, err = getDbToYangSpeed(speed)
+					intfObj.Ethernet.Config.PortSpeed = portSpeed
+				} else {
+					errStr = "port-speed not set"
+				}
+			}
+			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-ethernet-ext2:port-fec" {
+				fec, ok := entry.Field[PORT_FEC]
+				portFec := ocbinds.OpenconfigPlatformTypes_FEC_MODE_TYPE_UNSET
+				if ok {
+					portFec, err = getDbToYangFec(fec)
+					intfObj.Ethernet.Config.PortFec = portFec
+				} else {
+					errStr = "port-fec not set"
+				}
+			}
+			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-ethernet-ext2:standalone-link-training" {
+				lt, ok := entry.Field["link_training"]
+				if ok {
+					flag := (lt == "on")
+					intfObj.Ethernet.Config.StandaloneLinkTraining = &flag
+				} else {
+					errStr = "link_training not set"
+				}
+			}
+			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-ethernet-ext2:advertised-speed" {
+				spds, ok := entry.Field["adv_speeds"]
+				if ok {
+					intfObj.Ethernet.Config.AdvertisedSpeed = &spds
+				} else {
+					errStr = "advertised-speed not set"
+				}
+				if spds == "all" {
+					spds = ""
+				}
+			}
+			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-ethernet-ext2:diag-mode" {
+				diag, ok := entry.Field[PORT_DIAG_MODE]
+				diagMode := ocbinds.OpenconfigIfEthernetExt2_DIAG_MODE_TYPE_DIAG_MODE_OFF
+				if ok {
+					diagMode, err = getDbToYangDiag(diag)
+					intfObj.Ethernet.Config.DiagMode = diagMode
+				} else {
+					errStr = "diag-mode not set"
+				}
+			}
+		} else {
+			errStr = "Attribute not set"
+		}
+		if !get_cfg_obj && errStr != "" {
+			err = tlerr.InvalidArgsError{Format: errStr}
+		}
+	}
+
+	return err
+}
+
+var DbToYangPath_intf_eth_port_config_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
+	log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: params: ", params)
+
+	intfRoot := "/openconfig-interfaces:interfaces/interface"
+
+	if (params.tblName != "PORT") && (params.tblName != "PORTCHANNEL_MEMBER") &&
+		(params.tblName != "MGMT_PORT") {
+		log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: from wrong table: ", params.tblName)
+		return nil
+	}
+
+	if (params.tblName == "PORT") && (len(params.tblKeyComp) > 0) {
+		params.ygPathKeys[intfRoot+"/name"] = *utils.GetUINameFromNativeName(&params.tblKeyComp[0])
+	} else if (params.tblName == "PORTCHANNEL_MEMBER") && (len(params.tblKeyComp) > 1) {
+		params.ygPathKeys[intfRoot+"/name"] = *utils.GetUINameFromNativeName(&params.tblKeyComp[1])
+	} else if (params.tblName == "MGMT_PORT") && (len(params.tblKeyComp) > 0) {
+		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
+	} else {
+		log.Info("DbToYangPath_intf_eth_port_config_path_xfmr, wrong param: tbl ", params.tblName, " key ", params.tblKeyComp)
+		return nil
+	}
+
+	log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: params.ygPathkeys: ", params.ygPathKeys)
+
+	return nil
+}
+
 
 var DbToYang_intf_admin_status_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
 	var err error
