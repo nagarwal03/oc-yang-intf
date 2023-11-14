@@ -871,22 +871,22 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 	}
 
 	/* Handle Link Training config */
-	if intfObj.Ethernet.Config.StandaloneLinkTraining != nil {
-		intTbl := IntfTypeTblMap[intfType]
-		linkTr := intfObj.Ethernet.Config.StandaloneLinkTraining
-		var enStr string
-		if *linkTr {
-			enStr = "on"
-		} else {
-			enStr = "off"
-		}
-		res_map["link_training"] = enStr
-
-		if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
-			memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
-		}
-		memMap[intTbl.cfgDb.portTN][ifName] = value
-	}
+	//if intfObj.Ethernet.Config.StandaloneLinkTraining != nil {
+	//	intTbl := IntfTypeTblMap[intfType]
+	//	linkTr := intfObj.Ethernet.Config.StandaloneLinkTraining
+	//	var enStr string
+	//	if *linkTr {
+	//		enStr = "on"
+	//	} else {
+	//		enStr = "off"
+	//	}
+	//	res_map["link_training"] = enStr
+	//
+	//	if _, ok := memMap[intTbl.cfgDb.portTN]; !ok {
+	//		memMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+	//	}
+	//	memMap[intTbl.cfgDb.portTN][ifName] = value
+	//}
 
 	return memMap, err
 }
@@ -938,25 +938,25 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 			get_cfg_obj = true
 		}
 		var errStr string
-		if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id" {
-			is_id_populated := false
-			intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
-			if intf_lagId != nil {
-				if strings.HasPrefix(*intf_lagId, "PortChannel") {
-					intfObj.Ethernet.Config.AggregateId = intf_lagId
-					is_id_populated = true
-				}
-			}
-			if !is_id_populated {
-				errStr = "aggregate-id not set"
-			}
-
-			// subscribe for aggregate-id needs "Resource not found" for delete notification
-			if (targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id") && (!is_id_populated) {
-				err = tlerr.NotFoundError{Format: "Resource not found"}
-				return err
-			}
-		}
+		//if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id" {
+		//	is_id_populated := false
+		//	intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+		//	if intf_lagId != nil {
+		//		if strings.HasPrefix(*intf_lagId, "PortChannel") {
+		//			intfObj.Ethernet.Config.AggregateId = intf_lagId
+		//			is_id_populated = true
+		//		}
+		//	}
+		//	if !is_id_populated {
+		//		errStr = "aggregate-id not set"
+		//	}
+		//
+		//	// subscribe for aggregate-id needs "Resource not found" for delete notification
+		//	if (targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id") && (!is_id_populated) {
+		//		err = tlerr.NotFoundError{Format: "Resource not found"}
+		//		return err
+		//	}
+		//}
 
 		if entry.IsPopulated() {
 			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/auto-negotiate" {
@@ -983,15 +983,15 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 					errStr = "port-speed not set"
 				}
 			}
-			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-ethernet-ext2:standalone-link-training" {
-				lt, ok := entry.Field["link_training"]
-				if ok {
-					flag := (lt == "on")
-					intfObj.Ethernet.Config.StandaloneLinkTraining = &flag
-				} else {
-					errStr = "link_training not set"
-				}
-			}
+			//if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-ethernet-ext2:standalone-link-training" {
+			//	lt, ok := entry.Field["link_training"]
+			//	if ok {
+			//		flag := (lt == "on")
+			//		intfObj.Ethernet.Config.StandaloneLinkTraining = &flag
+			//	} else {
+			//		errStr = "link_training not set"
+			//	}
+			//}
 		} else {
 			errStr = "Attribute not set"
 		}
