@@ -37,16 +37,18 @@ func init() {
 	
 	XlateFuncBind("YangToDb_intf_tbl_key_xfmr", YangToDb_intf_tbl_key_xfmr)
 	XlateFuncBind("DbToYang_intf_tbl_key_xfmr", DbToYang_intf_tbl_key_xfmr)
-
-	XlateFuncBind("YangToDb_intf_eth_port_config_xfmr", YangToDb_intf_eth_port_config_xfmr)
-	XlateFuncBind("DbToYang_intf_eth_port_config_xfmr", DbToYang_intf_eth_port_config_xfmr)
-	
-	XlateFuncBind("DbToYangPath_intf_eth_port_config_path_xfmr", DbToYangPath_intf_eth_port_config_path_xfmr)
 	
 	XlateFuncBind("DbToYang_intf_admin_status_xfmr", DbToYang_intf_admin_status_xfmr)
 
 	XlateFuncBind("YangToDb_intf_enabled_xfmr", YangToDb_intf_enabled_xfmr)
 	XlateFuncBind("DbToYang_intf_enabled_xfmr", DbToYang_intf_enabled_xfmr)
+
+	XlateFuncBind("YangToDb_intf_eth_port_config_xfmr", YangToDb_intf_eth_port_config_xfmr)
+	XlateFuncBind("DbToYang_intf_eth_port_config_xfmr", DbToYang_intf_eth_port_config_xfmr)
+	
+	XlateFuncBind("DbToYangPath_intf_eth_port_config_path_xfmr", DbToYangPath_intf_eth_port_config_path_xfmr)
+
+	XlateFuncBind("DbToYang_intf_eth_port_speed_xfmr", DbToYang_intf_eth_port_speed_xfmr)
 
 }
 
@@ -366,7 +368,12 @@ func validateSpeed(d *db.DB, ifName string, speed string) error {
 	} else {
 		err = tlerr.InvalidArgs("Unsupported speed")
 		speeds := strings.Split(portEntry.Field["valid_speeds"], ",")
-
+		/*  Allow speed change for port-group member ports only when there more than 1 valid speeds.
+		    This is to make sure than port-group speed change error is thrown in other cases. */
+		if (len(speeds) < 2) && isPortGroupMember(ifName) {
+			err = tlerr.InvalidArgs("Port group member. Please use port group command to change the speed")
+			return err
+		}
 		if len(portEntry.Field["valid_speeds"]) < 1 {
 			speeds, _ = getValidSpeeds(ifName, d)
 			log.Info("Speed from platform.json ", speeds)
@@ -431,11 +438,14 @@ var intf_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string, error) 
 	var tblList []string
 	var err error
 
+	//pathInfo := NewPathInfo(inParams.uri)
+
+	//targetUriPath, _, _ := XfmrRemoveXPATHPredicates(inParams.uri)
+	//targetUriXpath, _, _ := XfmrRemoveXPATHPredicates(targetUriPath)
+
 	pathInfo := NewPathInfo(inParams.uri)
 
-	targetUriPath, _, _ := XfmrRemoveXPATHPredicates(inParams.uri)
-	
-	//targetUriPath := pathInfo.YangPath
+	targetUriPath := pathInfo.YangPath
 	targetUriXpath, _, _ := XfmrRemoveXPATHPredicates(targetUriPath)
 	
 
@@ -474,7 +484,12 @@ var intf_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string, error) 
 	subIfUri := "/openconfig-interfaces:interfaces/interface/subinterfaces/subinterface/"
 	rvlanUri := "/openconfig-interfaces:interfaces/interface/openconfig-vlan:routed-vlan/"
 
-	if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/config") {
+	if inParams.oper == DELETE && (targetUriXpath == "/openconfig-interfaces:interfaces/interface/subinterfaces/subinterface/ipv4" ||
+		targetUriXpath == "/openconfig-interfaces:interfaces/interface/subinterfaces/subinterface/ipv6") {
+		errStr := "DELETE operation not allowed on this container"
+		return tblList, tlerr.NotSupportedError{Path: "", Format: errStr}
+
+	} else if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/config") {
 		tblList = append(tblList, intTbl.cfgDb.portTN)
 	} else if intfType != IntfTypeEthernet && intfType != IntfTypeMgmt &&
 		strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet") {
@@ -776,15 +791,12 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 		portSpeed := intfObj.Ethernet.Config.PortSpeed
 		val, ok := intfOCToSpeedMap[portSpeed]
 		if ok {
-			err = validateSpeed(inParams.d, ifName, val)
-			if err == nil {
-				res_map[PORT_SPEED] = val
-				if IntfTypeMgmt != intfType {
-					res_map[PORT_AUTONEG] = "off"
-					res_map["adv_speeds"] = "all"
-					res_map["link_training"] = "off"
-					res_map["unreliable_los"] = "auto"
-				}
+			res_map[PORT_SPEED] = val
+			if IntfTypeMgmt != intfType {
+				res_map[PORT_AUTONEG] = "off"
+				//res_map["adv_speeds"] = "all"
+				//res_map["link_training"] = "off"
+				//res_map["unreliable_los"] = "auto"
 			}
 		} else {
 			err = tlerr.InvalidArgs("Invalid speed %s", val)
@@ -806,7 +818,7 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 			log.Info("Default speed for ", ifName, " is ", defSpeed)
 			if defSpeed != 0 {
 				val := strconv.FormatInt(int64(defSpeed), 10)
-				err = validateSpeed(inParams.d, ifName, val)
+				err = nil //validateSpeed(inParams.d, ifName, val)
 				if err == nil {
 					res_map[PORT_SPEED] = val
 				}
@@ -818,9 +830,9 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 					mode = "off"
 				}
 				res_map[PORT_AUTONEG] = mode
-				res_map["adv_speeds"] = "all"
-				res_map["link_training"] = "off"
-				res_map["unreliable_los"] = "auto"
+				//res_map["adv_speeds"] = "all"
+				//res_map["link_training"] = "off"
+				//res_map["unreliable_los"] = "auto"
 			}
 			if len(res_map) > 0 {
 				if _, ok := updateMap[intTbl.cfgDb.portTN]; !ok {
@@ -1030,6 +1042,37 @@ var DbToYangPath_intf_eth_port_config_path_xfmr PathXfmrDbToYangFunc = func(para
 	log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: params.ygPathkeys: ", params.ygPathKeys)
 
 	return nil
+}
+
+var DbToYang_intf_eth_port_speed_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+	var err error
+	result := make(map[string]interface{})
+
+	data := (*inParams.dbDataMap)[inParams.curDb]
+	intfType, _, ierr := getIntfTypeByName(inParams.key)
+	if intfType == IntfTypeUnset || ierr != nil {
+		log.Info("DbToYang_intf_eth_port_speed_xfmr - Invalid interface type IntfTypeUnset")
+		return result, errors.New("Invalid interface type IntfTypeUnset")
+	}
+	if IntfTypeVxlan == intfType || IntfTypeVlan == intfType {
+		return result, nil
+	}
+
+	intTbl := IntfTypeTblMap[intfType]
+
+	tblName, _ := getPortTableNameByDBId(intTbl, inParams.curDb)
+	pTbl := data[tblName]
+	prtInst := pTbl[inParams.key]
+	speed, ok := prtInst.Field[PORT_SPEED]
+	portSpeed := ocbinds.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
+	if ok {
+		portSpeed, err = getDbToYangSpeed(speed)
+		result["port-speed"] = ocbinds.E_OpenconfigIfEthernet_ETHERNET_SPEED.ΛMap(portSpeed)["E_OpenconfigIfEthernet_ETHERNET_SPEED"][int64(portSpeed)].Name
+	} else {
+		log.Info("Speed field not found in DB")
+	}
+
+	return result, err
 }
 
 
