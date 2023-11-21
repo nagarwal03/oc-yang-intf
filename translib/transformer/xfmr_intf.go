@@ -438,16 +438,9 @@ var intf_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string, error) 
 	var tblList []string
 	var err error
 
-	//pathInfo := NewPathInfo(inParams.uri)
-
-	//targetUriPath, _, _ := XfmrRemoveXPATHPredicates(inParams.uri)
-	//targetUriXpath, _, _ := XfmrRemoveXPATHPredicates(targetUriPath)
-
 	pathInfo := NewPathInfo(inParams.uri)
-
 	targetUriPath := pathInfo.YangPath
 	targetUriXpath, _, _ := XfmrRemoveXPATHPredicates(targetUriPath)
-	
 
 	ifName := pathInfo.Var("name")
 	if ifName == "" {
@@ -791,12 +784,10 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 		portSpeed := intfObj.Ethernet.Config.PortSpeed
 		val, ok := intfOCToSpeedMap[portSpeed]
 		if ok {
+			err = nil
 			res_map[PORT_SPEED] = val
 			if IntfTypeMgmt != intfType {
 				res_map[PORT_AUTONEG] = "off"
-				//res_map["adv_speeds"] = "all"
-				//res_map["link_training"] = "off"
-				//res_map["unreliable_los"] = "auto"
 			}
 		} else {
 			err = tlerr.InvalidArgs("Invalid speed %s", val)
@@ -818,10 +809,8 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 			log.Info("Default speed for ", ifName, " is ", defSpeed)
 			if defSpeed != 0 {
 				val := strconv.FormatInt(int64(defSpeed), 10)
-				err = nil //validateSpeed(inParams.d, ifName, val)
-				if err == nil {
-					res_map[PORT_SPEED] = val
-				}
+				err = nil
+				res_map[PORT_SPEED] = val
 			}
 			if IntfTypeMgmt != intfType {
 				var mode string
@@ -830,9 +819,6 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 					mode = "off"
 				}
 				res_map[PORT_AUTONEG] = mode
-				//res_map["adv_speeds"] = "all"
-				//res_map["link_training"] = "off"
-				//res_map["unreliable_los"] = "auto"
 			}
 			if len(res_map) > 0 {
 				if _, ok := updateMap[intTbl.cfgDb.portTN]; !ok {
@@ -950,25 +936,25 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 			get_cfg_obj = true
 		}
 		var errStr string
-		//if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id" {
-		//	is_id_populated := false
-		//	intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
-		//	if intf_lagId != nil {
-		//		if strings.HasPrefix(*intf_lagId, "PortChannel") {
-		//			intfObj.Ethernet.Config.AggregateId = intf_lagId
-		//			is_id_populated = true
-		//		}
-		//	}
-		//	if !is_id_populated {
-		//		errStr = "aggregate-id not set"
-		//	}
-		//
-		//	// subscribe for aggregate-id needs "Resource not found" for delete notification
-		//	if (targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id") && (!is_id_populated) {
-		//		err = tlerr.NotFoundError{Format: "Resource not found"}
-		//		return err
-		//	}
-		//}
+		if get_cfg_obj {
+			is_id_populated := false
+			intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+			if intf_lagId != nil {
+				if strings.HasPrefix(*intf_lagId, "PortChannel") {
+					intfObj.Ethernet.Config.AggregateId = intf_lagId
+					is_id_populated = true
+				}
+			}
+			if !is_id_populated {
+				errStr = "aggregate-id not set"
+			}
+		
+			// subscribe for aggregate-id needs "Resource not found" for delete notification
+			if (targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id") && (!is_id_populated) {
+				err = tlerr.NotFoundError{Format: "Resource not found"}
+				return err
+			}
+		}
 
 		if entry.IsPopulated() {
 			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/auto-negotiate" {
@@ -995,15 +981,15 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 					errStr = "port-speed not set"
 				}
 			}
-			//if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-ethernet-ext2:standalone-link-training" {
-			//	lt, ok := entry.Field["link_training"]
-			//	if ok {
-			//		flag := (lt == "on")
-			//		intfObj.Ethernet.Config.StandaloneLinkTraining = &flag
-			//	} else {
-			//		errStr = "link_training not set"
-			//	}
-			//}
+			if get_cfg_obj {
+				lt, ok := entry.Field["link_training"]
+				if ok {
+					flag := (lt == "on")
+					intfObj.Ethernet.Config.StandaloneLinkTraining = &flag
+				} else {
+					errStr = "link_training not set"
+				}
+			}
 		} else {
 			errStr = "Attribute not set"
 		}

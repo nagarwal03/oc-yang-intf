@@ -22,6 +22,12 @@ module openconfig-interfaces-annot {
         }
     }
 
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state {
+        deviate add {
+            sonic-ext:db-name "APPL_DB";
+        }
+    }
+
     deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state {
         deviate add {
             sonic-ext:db-name "APPL_DB";
