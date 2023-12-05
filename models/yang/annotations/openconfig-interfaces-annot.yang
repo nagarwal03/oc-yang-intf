@@ -34,6 +34,19 @@ module openconfig-interfaces-annot {
         }
     }
 
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:auto-negotiate {
+        deviate add {
+            sonic-ext:field-transformer "intf_eth_auto_neg_xfmr";
+            sonic-ext:field-name "autoneg";
+        }
+    }
+
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:config/oc-intf:mtu {
+        deviate add {
+            sonic-ext:field-transformer "intf_mtu_xfmr";
+        }
+    }
+
     deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:port-speed {
         deviate add {
             sonic-ext:field-transformer "intf_eth_port_speed_xfmr";

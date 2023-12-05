@@ -37,6 +37,9 @@ func init() {
 	
 	XlateFuncBind("YangToDb_intf_tbl_key_xfmr", YangToDb_intf_tbl_key_xfmr)
 	XlateFuncBind("DbToYang_intf_tbl_key_xfmr", DbToYang_intf_tbl_key_xfmr)
+
+	XlateFuncBind("YangToDb_intf_mtu_xfmr", YangToDb_intf_mtu_xfmr)
+	XlateFuncBind("DbToYang_intf_mtu_xfmr", DbToYang_intf_mtu_xfmr)
 	
 	XlateFuncBind("DbToYang_intf_admin_status_xfmr", DbToYang_intf_admin_status_xfmr)
 
@@ -48,6 +51,8 @@ func init() {
 	
 	XlateFuncBind("DbToYangPath_intf_eth_port_config_path_xfmr", DbToYangPath_intf_eth_port_config_path_xfmr)
 
+	XlateFuncBind("DbToYang_intf_eth_auto_neg_xfmr", DbToYang_intf_eth_auto_neg_xfmr)
+
 	XlateFuncBind("DbToYang_intf_eth_port_speed_xfmr", DbToYang_intf_eth_port_speed_xfmr)
 
 }
@@ -57,6 +62,7 @@ const (
 	PORTCHANNEL_TN           = "PORTCHANNEL"
 	PORT_SPEED               = "speed"
 	PORT_AUTONEG             = "autoneg"
+	DEFAULT_MTU              = "9100"
 )
 
 const (
@@ -344,6 +350,22 @@ func retrievePortChannelAssociatedWithIntf(inParams *XfmrParams, ifName *string)
 		return &lagStr, err
 	}
 	return nil, err
+}
+
+func updateDefaultMtu(inParams *XfmrParams, ifName *string, ifType E_InterfaceType, resMap map[string]string) error {
+	var err error
+	subOpMap := make(map[db.DBNum]map[string]map[string]db.Value)
+	intfMap := make(map[string]map[string]db.Value)
+
+	intTbl := IntfTypeTblMap[ifType]
+	resMap["mtu"] = DEFAULT_MTU
+
+	intfMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
+	intfMap[intTbl.cfgDb.portTN][*ifName] = db.Value{Field: resMap}
+
+	subOpMap[db.ConfigDB] = intfMap
+	inParams.subOpDataMap[UPDATE] = &subOpMap
+	return err
 }
 
 /* Get default speed from valid speeds.  Max valid speed should be the default speed.*/
@@ -658,6 +680,99 @@ var DbToYang_intf_tbl_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[
 	return res_map, nil
 }
 
+var YangToDb_intf_mtu_xfmr FieldXfmrYangToDb = func(inParams XfmrParams) (map[string]string, error) {
+	res_map := make(map[string]string)
+	var ifName string
+	intfsObj := getIntfsRoot(inParams.ygRoot)
+	if intfsObj == nil || len(intfsObj.Interface) < 1 {
+		return res_map, nil
+	} else {
+		for infK := range intfsObj.Interface {
+			ifName = infK
+		}
+	}
+	intfType, _, _ := getIntfTypeByName(ifName)
+	if IntfTypeVxlan == intfType {
+		return res_map, nil
+	}
+	if inParams.oper == DELETE {
+		log.Infof("Updating the Interface: %s with default MTU", ifName)
+		if intfType == IntfTypeLoopback {
+			log.Infof("MTU not supported for Loopback Interface Type: %d", intfType)
+			return res_map, nil
+		}
+		/* Note: For the mtu delete request, res_map with delete operation and
+		   subOp map with update operation (default MTU value) is filled. This is because, transformer default
+		   updates the result DS for delete oper with table and key. This needs to be fixed by transformer
+		   for deletion of an attribute */
+		err := updateDefaultMtu(&inParams, &ifName, intfType, res_map)
+		if err != nil {
+			log.Errorf("Updating Default MTU for Interface: %s failed", ifName)
+			return res_map, err
+		}
+		return res_map, nil
+	}
+	// Handles all the operations other than Delete
+	intfTypeVal, _ := inParams.param.(*uint16)
+	intTypeValStr := strconv.FormatUint(uint64(*intfTypeVal), 10)
+
+	if IntfTypePortChannel == intfType {
+		/* Apply the MTU to all the portchannel member ports */
+		//updateMemberPortsMtu(&inParams, &ifName, &intTypeValStr)
+	} else if IntfTypeEthernet == intfType {
+		/* Do not allow MTU configuration on a portchannel member port */
+		lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+		if lagId != nil {
+			log.Infof("%s is member of %s", ifName, *lagId)
+			errStr := "Configuration not allowed when port is member of Portchannel."
+			return nil, tlerr.InvalidArgsError{Format: errStr}
+		}
+	}
+
+	res_map["mtu"] = intTypeValStr
+	return res_map, nil
+}
+
+var DbToYang_intf_mtu_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+	var err error
+	result := make(map[string]interface{})
+
+	data := (*inParams.dbDataMap)[inParams.curDb]
+
+	intfType, _, ierr := getIntfTypeByName(inParams.key)
+	if intfType == IntfTypeUnset || ierr != nil {
+		log.Info("DbToYang_intf_mtu_xfmr - Invalid interface type IntfTypeUnset")
+		return result, errors.New("Invalid interface type IntfTypeUnset")
+	}
+	if IntfTypeVxlan == intfType {
+		return result, nil
+	}
+	intTbl := IntfTypeTblMap[intfType]
+
+	tblName, _ := getPortTableNameByDBId(intTbl, inParams.curDb)
+	if _, ok := data[tblName]; !ok {
+		log.Info("DbToYang_intf_mtu_xfmr table not found : ", tblName)
+		return result, errors.New("table not found : " + tblName)
+	}
+
+	pTbl := data[tblName]
+	if _, ok := pTbl[inParams.key]; !ok {
+		log.Info("DbToYang_intf_mtu_xfmr Interface not found : ", inParams.key)
+		return result, errors.New("Interface not found : " + inParams.key)
+	}
+	prtInst := pTbl[inParams.key]
+	mtuStr, ok := prtInst.Field["mtu"]
+	if ok {
+		//mtuVal, err := strconv.ParseFloat(mtuStr, 64)
+		mtuVal, err := strconv.ParseUint(mtuStr, 10, 16)
+		if err != nil {
+			return result, err
+		}
+		result["mtu"] = mtuVal
+	}
+	return result, err
+}
+
 // YangToDb_intf_eth_port_config_xfmr handles port-speed, unreliable-los, auto-neg and aggregate-id config.
 var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
 	var err error
@@ -801,35 +916,10 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 		}
 	} else if requestUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/port-speed" {
 		if inParams.oper == DELETE {
-			updateMap := make(map[string]map[string]db.Value)
-			intTbl := IntfTypeTblMap[intfType]
-			res_map := make(map[string]string)
-			value := db.Value{Field: res_map}
-			defSpeed := getDefaultSpeed(inParams.d, ifName)
-			log.Info("Default speed for ", ifName, " is ", defSpeed)
-			if defSpeed != 0 {
-				val := strconv.FormatInt(int64(defSpeed), 10)
-				err = nil
-				res_map[PORT_SPEED] = val
-			}
-			if IntfTypeMgmt != intfType {
-				var mode string
-				mode, err = getDefaultAutoNegMode(ifName)
-				if err != nil {
-					mode = "off"
-				}
-				res_map[PORT_AUTONEG] = mode
-			}
-			if len(res_map) > 0 {
-				if _, ok := updateMap[intTbl.cfgDb.portTN]; !ok {
-					updateMap[intTbl.cfgDb.portTN] = make(map[string]db.Value)
-				}
-				updateMap[intTbl.cfgDb.portTN][ifName] = value
-				subOpMap := make(map[db.DBNum]map[string]map[string]db.Value)
-				subOpMap[db.ConfigDB] = updateMap
-				inParams.subOpDataMap[UPDATE] = &subOpMap
-			}
-		} else {
+			//return nil, errors.New("PortSpeed DELETE not supported")
+			err_str := "DELETE request not allowed for port-speed"
+			return nil, tlerr.NotSupported(err_str)
+			} else {
 			log.Error("Unexpected oper ", inParams.oper)
 		}
 	}
@@ -1028,6 +1118,37 @@ var DbToYangPath_intf_eth_port_config_path_xfmr PathXfmrDbToYangFunc = func(para
 	log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: params.ygPathkeys: ", params.ygPathKeys)
 
 	return nil
+}
+
+var DbToYang_intf_eth_auto_neg_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+	var err error
+	result := make(map[string]interface{})
+
+	data := (*inParams.dbDataMap)[inParams.curDb]
+	intfType, _, ierr := getIntfTypeByName(inParams.key)
+	if intfType == IntfTypeUnset || ierr != nil {
+		log.Info("DbToYang_intf_eth_auto_neg_xfmr - Invalid interface type IntfTypeUnset")
+		return result, errors.New("Invalid interface type IntfTypeUnset")
+	}
+	if IntfTypeMgmt != intfType && IntfTypeEthernet != intfType {
+		return result, nil
+	}
+	intTbl := IntfTypeTblMap[intfType]
+
+	tblName, _ := getPortTableNameByDBId(intTbl, inParams.curDb)
+	pTbl := data[tblName]
+	prtInst := pTbl[inParams.key]
+	autoNeg, ok := prtInst.Field[PORT_AUTONEG]
+	if ok {
+		if autoNeg == "on" || autoNeg == "true" {
+			result["auto-negotiate"] = true
+		} else {
+			result["auto-negotiate"] = false
+		}
+	} else {
+		log.Info("auto-negotiate field not found in DB")
+	}
+	return result, err
 }
 
 var DbToYang_intf_eth_port_speed_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
