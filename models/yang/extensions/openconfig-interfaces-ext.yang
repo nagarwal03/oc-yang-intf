@@ -112,6 +112,17 @@ module openconfig-interfaces-ext {
         deviate not-supported;
     }
 
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:hw-mac-address {
+        deviate not-supported;
+    }
+
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:negotiated-duplex-mode {
+        deviate not-supported;
+    }
+
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:negotiated-port-speed {
+        deviate not-supported;
+    }
 
     deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-vlan:switched-vlan {
         deviate not-supported;
