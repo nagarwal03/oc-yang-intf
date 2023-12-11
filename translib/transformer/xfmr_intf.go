@@ -839,57 +839,57 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 	}
 
 	/* Handle AggregateId config */
-	if intfObj.Ethernet.Config.AggregateId != nil {
-		if !strings.HasPrefix(ifName, ETHERNET) {
-			return nil, errors.New("Invalid config request")
-		}
-		intTbl := IntfTypeTblMap[IntfTypePortChannel]
-		tblName, _ := getMemTableNameByDBId(intTbl, inParams.curDb)
-
-		switch inParams.oper {
-		case CREATE:
-			fallthrough
-		case REPLACE:
-			fallthrough
-		case UPDATE:
-			log.Info("Add member port")
-			lagId := intfObj.Ethernet.Config.AggregateId
-			lagStr = *lagId
-
-			intfType, _, err := getIntfTypeByName(ifName)
-			if intfType != IntfTypeEthernet || err != nil {
-				intfTypeStr := strconv.Itoa(int(intfType))
-				errStr := "Invalid interface type" + intfTypeStr
-				log.Error(errStr)
-				return nil, tlerr.InvalidArgsError{Format: errStr}
-			}
-			/* Check if PortChannel exists */
-			err = validateIntfExists(inParams.d, intTbl.cfgDb.portTN, lagStr)
-			if err != nil {
-				return nil, err
-			}
-
-		case DELETE:
-			lagId, err := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
-			if lagId != nil {
-				log.Infof("%s is member of %s", ifName, *lagId)
-			}
-			if lagId == nil || err != nil {
-				return nil, nil
-			}
-			lagStr = *lagId
-		} /* End of switch case */
-		if len(lagStr) != 0 {
-			m := make(map[string]string)
-			value := db.Value{Field: m}
-			m["NULL"] = "NULL"
-			intfKey := lagStr + "|" + ifName
-			if _, ok := memMap[tblName]; !ok {
-				memMap[tblName] = make(map[string]db.Value)
-			}
-			memMap[tblName][intfKey] = value
-		}
-	}
+	//if intfObj.Ethernet.Config.AggregateId != nil {
+	//	if !strings.HasPrefix(ifName, ETHERNET) {
+	//		return nil, errors.New("Invalid config request")
+	//	}
+	//	intTbl := IntfTypeTblMap[IntfTypePortChannel]
+	//	tblName, _ := getMemTableNameByDBId(intTbl, inParams.curDb)
+//
+	//	switch inParams.oper {
+	//	case CREATE:
+	//		fallthrough
+	//	case REPLACE:
+	//		fallthrough
+	//	case UPDATE:
+	//		log.Info("Add member port")
+	//		lagId := intfObj.Ethernet.Config.AggregateId
+	//		lagStr = *lagId
+//
+	//		intfType, _, err := getIntfTypeByName(ifName)
+	//		if intfType != IntfTypeEthernet || err != nil {
+	//			intfTypeStr := strconv.Itoa(int(intfType))
+	//			errStr := "Invalid interface type" + intfTypeStr
+	//			log.Error(errStr)
+	//			return nil, tlerr.InvalidArgsError{Format: errStr}
+	//		}
+	//		/* Check if PortChannel exists */
+	//		err = validateIntfExists(inParams.d, intTbl.cfgDb.portTN, lagStr)
+	//		if err != nil {
+	//			return nil, err
+	//		}
+//
+	//	case DELETE:
+	//		lagId, err := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+	//		if lagId != nil {
+	//			log.Infof("%s is member of %s", ifName, *lagId)
+	//		}
+	//		if lagId == nil || err != nil {
+	//			return nil, nil
+	//		}
+	//		lagStr = *lagId
+	//	} /* End of switch case */
+	//	if len(lagStr) != 0 {
+	//		m := make(map[string]string)
+	//		value := db.Value{Field: m}
+	//		m["NULL"] = "NULL"
+	//		intfKey := lagStr + "|" + ifName
+	//		if _, ok := memMap[tblName]; !ok {
+	//			memMap[tblName] = make(map[string]db.Value)
+	//		}
+	//		memMap[tblName][intfKey] = value
+	//	}
+	//}
 	/* Handle PortSpeed config */
 	if intfObj.Ethernet.Config.PortSpeed != 0 {
 		res_map := make(map[string]string)
@@ -1030,10 +1030,10 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 			is_id_populated := false
 			intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
 			if intf_lagId != nil {
-				if strings.HasPrefix(*intf_lagId, "PortChannel") {
-					intfObj.Ethernet.Config.AggregateId = intf_lagId
-					is_id_populated = true
-				}
+			//	if strings.HasPrefix(*intf_lagId, "PortChannel") {
+			//		intfObj.Ethernet.Config.AggregateId = intf_lagId
+			//		is_id_populated = true
+			//	}
 			}
 			if !is_id_populated {
 				errStr = "aggregate-id not set"
@@ -1072,13 +1072,13 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 				}
 			}
 			if get_cfg_obj {
-				lt, ok := entry.Field["link_training"]
-				if ok {
-					flag := (lt == "on")
-					intfObj.Ethernet.Config.StandaloneLinkTraining = &flag
-				} else {
+			//	lt, ok := entry.Field["link_training"]
+			//	if ok {
+			//		flag := (lt == "on")
+			//		intfObj.Ethernet.Config.StandaloneLinkTraining = &flag
+			//	} else {
 					errStr = "link_training not set"
-				}
+			//	}
 			}
 		} else {
 			errStr = "Attribute not set"
