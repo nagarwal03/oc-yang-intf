@@ -40,6 +40,11 @@ module openconfig-interfaces-ext {
 	     deviate not-supported;
     }    
 
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:config/oc-intf:type {
+	     deviate not-supported;
+    }   
+
+
     deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:loopback-mode {
 	     deviate not-supported;
     }    
@@ -60,6 +65,9 @@ module openconfig-interfaces-ext {
 	     deviate not-supported;
     }   
 
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:hold-time {
+	     deviate not-supported;
+    }   
 
     deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:config/oc-eth:mac-address {
         deviate not-supported;
