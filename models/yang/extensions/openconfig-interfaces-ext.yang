@@ -60,8 +60,20 @@ module openconfig-interfaces-ext {
     deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:counters {
 	     deviate not-supported;
     }    
-    
-    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-vlan:tpid {
+
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:type {
+	     deviate not-supported;
+    }   
+
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:ifindex {
+	     deviate not-supported;
+    }   
+
+    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:logical {
+	     deviate not-supported;
+    }   
+
+        deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-vlan:tpid {
 	     deviate not-supported;
     }   
 
