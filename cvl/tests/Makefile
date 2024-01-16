@@ -19,15 +19,15 @@
 
 SRC_FILES=$(wildcard *.go)
 OUT=$(patsubst %.go, %, $(SRC_FILES)) 
-TOPDIR := ../..
-GO ?= go
+TOPDIR := $(abspath ../..)
+GO=/usr/local/go/bin/go
 
 all:tests
 
 tests: $(OUT)
 
 %:%.go
-	make -C .. test-schema
+	make -C ../testdata/schema
 	@echo "Building $@ ..."
 	$(GO) build -mod=vendor -gcflags="all=-N -l" $<
 

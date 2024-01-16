@@ -761,8 +761,8 @@ func dbMapFill(tableName string, curPath string, moduleNm string, xDbSpecMap map
 				log.Warningf("Memory allocation failure for storing Tbl order and dependency info for sonic module %v", moduleNm)
 				break
 			}
-			cvlSess, cvlRetSess := cvl.ValidationSessOpen()
-			if cvlRetSess != cvl.CVL_SUCCESS {
+			cvlSess, cvlRetSess := db.NewValidationSession()
+			if cvlRetSess != nil {
 				log.Warningf("Failure in creating CVL validation session object required to use CVl API to get Tbl info for module %v - %v", moduleNm, cvlRetSess)
 				break
 			}
@@ -929,6 +929,8 @@ func annotEntryFill(xYangSpecMap map[string]*yangXpathInfo, xpath string, entry 
 			case "rpc-callback":
 				xYangRpcSpecMap[xpath] = ext.NName()
 				xpathData.yangType = YANG_RPC
+			case "path-transformer":
+				xpathData.xfmrPath = ext.NName()
 			case "use-self-key":
 				xpathData.keyXpath = nil
 			case "db-name":
@@ -1188,6 +1190,7 @@ func mapPrint(fileName string) {
 		fmt.Fprintf(fp, "    hasNonTerminalNode : %v\r\n", d.hasNonTerminalNode)
 		fmt.Fprintf(fp, "    subscribeOnChg disbale flag: %v\r\n", d.subscriptionFlags.Has(subsOnChangeDisable))
 		fmt.Fprintf(fp, "    subscribeOnChg enable flag: %v\r\n", d.subscriptionFlags.Has(subsOnChangeEnable))
+		fmt.Fprintf(fp, "    subscribeMinIntvl  : %v\r\n", d.subscribeMinIntvl)
 		fmt.Fprintf(fp, "    subscribePref Sample     : %v\r\n", d.subscriptionFlags.Has(subsPrefSample))
 		fmt.Fprintf(fp, "    tableName: ")
 		if d.tableName != nil {

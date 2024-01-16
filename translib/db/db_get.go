@@ -49,8 +49,6 @@ func (d *DB) Get(key string) (string, error) {
 		return "", UseGetEntry
 	}
 
-	// If pseudoDB then return not supported. TBD.
-
 	glog.Info("Get: RedisCmd: ", d.Name(), ": ", "GET ", key)
 	val, e := d.client.Get(key).Result()
 

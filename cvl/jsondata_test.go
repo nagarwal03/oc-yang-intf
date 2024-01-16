@@ -64,7 +64,7 @@ var json_validate_config_data = []string{`{
 					    "AZURE": {
 						"Ethernet8": "5m",
 						"Ethernet12": "5m",
-						"Ethernet16": "5m",
+						"Ethernet16": "5m"
 					    }
 					  }
 					}`}
