@@ -469,8 +469,6 @@ func getValidSpeeds(port_i string, d *db.DB) ([]string, error) {
 	return valid_speeds, nil
 }
 
-
-
 func getDefaultAutoNegMode(port_i string) (string, error) {
 
 	//ifName := *(utils.GetNativeNameFromName(&port_i))
