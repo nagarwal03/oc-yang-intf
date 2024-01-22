@@ -137,16 +137,4 @@ module openconfig-interfaces-annot {
             sonic-ext:field-transformer "ipv6_enabled_xfmr";
         }
     }
-    
-    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:nat-zone {
-        deviate add {
-            sonic-ext:subtree-transformer "intf_nat_zone_xfmr";
-        }
-    }
-
-    deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:nat-zone/oc-intf:state {
-        deviate add {
-            sonic-ext:db-name "APPL_DB";
-        }
-    }
 }
