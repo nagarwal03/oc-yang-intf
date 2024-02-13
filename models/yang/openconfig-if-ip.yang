@@ -390,10 +390,7 @@ module openconfig-if-ip {
       description
        "The length of the subnet prefix.";
     }
-    leaf secondary  {
-      type boolean;
-      description "Indicates whether the IPv4 address is configured as primary or secondary";
-    }
+    
     leaf family  {
       type string;
       description "Indicates whether the IP address is IPv4 or IPv6";

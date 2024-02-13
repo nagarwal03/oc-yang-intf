@@ -134,5 +134,9 @@ module openconfig-interfaces-deviation {
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:subinterfaces/oc-intf:subinterface/oc-ip:ipv6/oc-ip:state {
     deviate not-supported;
   }
+  
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-vlan:routed-vlan {
+    deviate not-supported;
+  }
  
 }
