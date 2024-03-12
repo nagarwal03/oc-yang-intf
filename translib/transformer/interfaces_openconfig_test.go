@@ -23,12 +23,22 @@ package transformer_test
 
 import (
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
+	"os/exec"
 	"testing"
 	"time"
 )
 
 func Test_openconfig_interfaces(t *testing.T) {
 	var url, url_input_body_json string
+
+	cmd := exec.Command("sonic-db-dump", "-y", "-n", "CONFIG_DB", "-k", "\"PORT|*\"")
+
+	out, err := cmd.Output()
+	if err != nil {
+		t.Log("DB Dump command failed")
+	}
+
+	t.Log(string(out))
 
 	t.Log("\n\n+++++++++++++ CONFIGURING INTERFACES ATTRIBUTES ++++++++++++")
 	t.Log("\n\n--- PATCH interfaces config---")
