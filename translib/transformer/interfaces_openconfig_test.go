@@ -22,6 +22,7 @@
 package transformer_test
 
 import (
+	"fmt"
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
 	"os/exec"
 	"testing"
@@ -31,14 +32,25 @@ import (
 func Test_openconfig_interfaces(t *testing.T) {
 	var url, url_input_body_json string
 
-	cmd := exec.Command("sonic-db-dump", "-y", "-n", "CONFIG_DB", "-k", "\"PORT|*\"")
+	t.Log("=-=-=-=-= shell command =-=-=-=-=")
+	out, err := exec.Command("/bin/sh", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
 
-	out, err := cmd.Output()
 	if err != nil {
-		t.Log("DB Dump command failed")
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
 	}
 
 	t.Log(string(out))
+
+	t.Log("=-=-=-=-= bash command =-=-=-=-=")
+	out, err = exec.Command("bash", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
+
+	if err != nil {
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
+	}
+
+	t.Log(string(out))
+
+	t.Log("=-=-=-=-= end DB dump =-=-=-=-=")
 
 	t.Log("\n\n+++++++++++++ CONFIGURING INTERFACES ATTRIBUTES ++++++++++++")
 	t.Log("\n\n--- PATCH interfaces config---")
