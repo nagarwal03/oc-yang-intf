@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-//  Copyright 2023 Dell, Inc.                                                 //
+//  Copyright 2024 Dell, Inc.                                                 //
 //                                                                            //
 //  Licensed under the Apache License, Version 2.0 (the "License");           //
 //  you may not use this file except in compliance with the License.          //
@@ -22,13 +22,35 @@
 package transformer_test
 
 import (
+	"fmt"
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
+	"os/exec"
 	"testing"
 	"time"
 )
 
 func Test_openconfig_interfaces(t *testing.T) {
 	var url, url_input_body_json string
+
+	t.Log("=-=-=-=-= shell command =-=-=-=-=")
+	out, err := exec.Command("/bin/sh", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
+
+	if err != nil {
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
+	}
+
+	t.Log(string(out))
+
+	t.Log("=-=-=-=-= bash command =-=-=-=-=")
+	out, err = exec.Command("bash", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
+
+	if err != nil {
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
+	}
+
+	t.Log(string(out))
+
+	t.Log("=-=-=-=-= end DB dump =-=-=-=-=")
 
 	t.Log("\n\n+++++++++++++ CONFIGURING INTERFACES ATTRIBUTES ++++++++++++")
 	t.Log("\n\n--- PATCH interfaces config---")
