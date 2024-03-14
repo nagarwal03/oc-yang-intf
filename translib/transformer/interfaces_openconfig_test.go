@@ -169,6 +169,11 @@ func Test_openconfig_ethernet(t *testing.T) {
 	t.Run("Test PATCH on ethernet auto-neg", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
 
+	cleanuptbl := map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": ""}}
+	unloadDB(db.ApplDB, cleanuptbl)
+	pre_req_map := map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": map[string]interface{}{"admin_status": "up", "autoneg": "on", "mtu": "9100", "speed": "40000"}}}
+	loadDB(db.ApplDB, pre_req_map)
+
 	t.Log("\n\n--- Verify PATCH ethernet ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/openconfig-if-ethernet:ethernet"
 	expected_get_json := "{\"openconfig-if-ethernet:ethernet\": {\"config\": {\"auto-negotiate\": true,\"port-speed\": \"openconfig-if-ethernet:SPEED_40GB\"},\"state\": {\"auto-negotiate\": true,\"port-speed\": \"openconfig-if-ethernet:SPEED_40GB\"}}}"
@@ -189,7 +194,7 @@ func Test_openconfig_ethernet(t *testing.T) {
 
 	t.Log("\n\n--- Verify DELETE at ethernet container  ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/openconfig-if-ethernet:ethernet/state"
-	expected_get_json = "{\"openconfig-if-ethernet:state\": {\"auto-negotiate\": true,\"port-speed\": \"openconfig-if-ethernet:SPEED_40GB\"}}"
+	expected_get_json = "{\"openconfig-if-ethernet:state\": {\"auto-negotiate\": true, \"port-speed\": \"openconfig-if-ethernet:SPEED_40GB\"}}"
 	t.Run("Test GET on ethernet state", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
 
