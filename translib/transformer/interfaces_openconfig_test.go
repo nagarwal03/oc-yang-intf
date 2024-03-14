@@ -23,6 +23,7 @@ package transformer_test
 
 import (
 	"fmt"
+	"github.com/Azure/sonic-mgmt-common/translib/db"
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
 	"os/exec"
 	"testing"
@@ -81,9 +82,14 @@ func Test_openconfig_interfaces(t *testing.T) {
 	t.Run("Test PATCH on interface description", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
 
+	cleanuptbl := map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": ""}}
+	unloadDB(db.ApplDB, cleanuptbl)
+	pre_req_map := map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": map[string]interface{}{"admin_status": "up", "mtu": "9000"}}}
+	loadDB(db.ApplDB, pre_req_map)
+
 	t.Log("\n\n--- Verify PATCH interface leaf nodes  ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/state"
-	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"description\": \"\", \"enabled\": true, \"mtu\": 9000, \"name\": \"Ethernet0\"}}"
+	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"enabled\": true, \"mtu\": 9000, \"name\": \"Ethernet0\"}}"
 	t.Run("Test GET on interface state", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
 
@@ -134,11 +140,18 @@ func Test_openconfig_interfaces(t *testing.T) {
 	t.Run("Test PATCH on interface", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
 
+	cleanuptbl = map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": ""}}
+	unloadDB(db.ApplDB, cleanuptbl)
+	pre_req_map = map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": map[string]interface{}{"admin_status": "up", "mtu": "9100"}}}
+	loadDB(db.ApplDB, pre_req_map)
+
 	t.Log("\n\n--- Verify PATCH interface ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/state"
-	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"description\": \"\", \"enabled\": true, \"mtu\": 9100, \"name\": \"Ethernet0\"}}"
+	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"enabled\": true, \"mtu\": 9100, \"name\": \"Ethernet0\"}}"
 	t.Run("Test GET on interface state", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
+
+	unloadDB(db.ApplDB, cleanuptbl)
 }
 
 func Test_openconfig_ethernet(t *testing.T) {
