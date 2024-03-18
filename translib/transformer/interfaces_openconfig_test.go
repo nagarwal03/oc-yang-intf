@@ -365,7 +365,7 @@ func Test_openconfig_subintf_ipv4(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	t.Run("Test Patch/Set IPv4 address on subinterfaces addresses", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
-	
+
 	t.Log("=-=-=-=-= Config DB dump shell command =-=-=-=-=")
 	out, err := exec.Command("/bin/sh", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
 
@@ -528,7 +528,7 @@ func Test_openconfig_subintf_ipv6(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	t.Run("Test Patch/Set IPv6 address on subinterfaces addresses", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
-	
+
 	t.Log("=-=-=-=-= Config DB dump shell command =-=-=-=-=")
 	out, err := exec.Command("/bin/sh", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
 
