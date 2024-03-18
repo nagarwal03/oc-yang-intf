@@ -365,6 +365,26 @@ func Test_openconfig_subintf_ipv4(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	t.Run("Test Patch/Set IPv4 address on subinterfaces addresses", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
+	
+	t.Log("=-=-=-=-= Config DB dump shell command =-=-=-=-=")
+	out, err := exec.Command("/bin/sh", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
+
+	if err != nil {
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
+	}
+
+	t.Log(string(out))
+
+	t.Log("=-=-=-=-= Config DB dump bash command =-=-=-=-=")
+	out, err = exec.Command("bash", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
+
+	if err != nil {
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
+	}
+
+	t.Log(string(out))
+
+	t.Log("=-=-=-=-= end Config DB dump =-=-=-=-=")
 
 	t.Log("\n\n--- Verify PATCH IPv4 address at addresses/address/config level ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/subinterfaces/subinterface[index=0]/openconfig-if-ip:ipv4/addresses/address[ip=4.4.4.4]/config"
@@ -508,6 +528,26 @@ func Test_openconfig_subintf_ipv6(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	t.Run("Test Patch/Set IPv6 address on subinterfaces addresses", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
+	
+	t.Log("=-=-=-=-= Config DB dump shell command =-=-=-=-=")
+	out, err := exec.Command("/bin/sh", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
+
+	if err != nil {
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
+	}
+
+	t.Log(string(out))
+
+	t.Log("=-=-=-=-= Config DB dump bash command =-=-=-=-=")
+	out, err = exec.Command("bash", "-c", "sonic-db-dump -y -n CONFIG_DB -k 'PORT|Ethernet0'").Output()
+
+	if err != nil {
+		fmt.Println("DB Dump command failed : err ==> ", err.Error())
+	}
+
+	t.Log(string(out))
+
+	t.Log("=-=-=-=-= end Config DB dump =-=-=-=-=")
 
 	t.Log("\n\n--- Verify PATCH IPv6 address at subinterfaces ipv6/config level ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/subinterfaces/subinterface[index=0]/openconfig-if-ip:ipv6/addresses/address[ip=a::e]/config"
