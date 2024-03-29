@@ -88,6 +88,10 @@ module openconfig-interfaces-deviation {
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:subinterfaces/oc-intf:subinterface/oc-intf:state/oc-intf:admin-status {
     deviate not-supported;
   }
+  
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:subinterfaces/oc-intf:subinterface/oc-intf:state/oc-intf:name {
+   deviate not-supported;
+  }
 
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:subinterfaces/oc-intf:subinterface/oc-intf:state/oc-intf:oper-status {
     deviate not-supported;
