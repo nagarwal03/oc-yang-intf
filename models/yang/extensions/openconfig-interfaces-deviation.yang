@@ -211,10 +211,6 @@ module openconfig-interfaces-deviation {
     deviate not-supported;
   }
 
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:config/oc-lag:aggregate-id {
-    deviate not-supported;
-  }
-
   deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:mac-address {
     deviate not-supported;
   }
@@ -228,10 +224,6 @@ module openconfig-interfaces-deviation {
   }
 
   deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters {
-    deviate not-supported;
-  }
-
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-lag:aggregate-id {
     deviate not-supported;
   }
 
@@ -250,12 +242,28 @@ module openconfig-interfaces-deviation {
   deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-vlan:switched-vlan {
     deviate not-supported;
   }
-
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-tun:tunnel {
+  
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-lag:aggregation/oc-vlan:switched-vlan {
     deviate not-supported;
   }
 
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-lag:aggregation {
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-lag:aggregation/oc-lag:config/oc-lag:lag-type {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-lag:aggregation/oc-lag:state/oc-lag:lag-type {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-lag:aggregation/oc-lag:state/oc-lag:lag-speed {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-lag:aggregation/oc-lag:state/oc-lag:member {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-tun:tunnel {
     deviate not-supported;
   }
 
