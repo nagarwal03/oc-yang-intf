@@ -45,6 +45,7 @@ func init() {
 	XlateFuncBind("DbToYang_intf_admin_status_xfmr", DbToYang_intf_admin_status_xfmr)
 	XlateFuncBind("YangToDb_intf_enabled_xfmr", YangToDb_intf_enabled_xfmr)
 	XlateFuncBind("DbToYang_intf_enabled_xfmr", DbToYang_intf_enabled_xfmr)
+	XlateFuncBind("DbToYang_intf_eth_aggr_id_xfmr", DbToYang_intf_eth_aggr_id_xfmr)
 	XlateFuncBind("YangToDb_intf_eth_port_config_xfmr", YangToDb_intf_eth_port_config_xfmr)
 	XlateFuncBind("DbToYang_intf_eth_port_config_xfmr", DbToYang_intf_eth_port_config_xfmr)
 	XlateFuncBind("DbToYang_intf_eth_auto_neg_xfmr", DbToYang_intf_eth_auto_neg_xfmr)
@@ -614,9 +615,10 @@ var DbToYang_intf_mtu_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[st
 	return result, err
 }
 
-// YangToDb_intf_eth_port_config_xfmr handles port-speed, and auto-neg config.
+// YangToDb_intf_eth_port_config_xfmr handles port-speed, auto-neg, and aggregate-id config.
 var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
 	var err error
+	var lagStr string
 	memMap := make(map[string]map[string]db.Value)
 
 	pathInfo := NewPathInfo(inParams.uri)
@@ -647,7 +649,84 @@ var YangToDb_intf_eth_port_config_xfmr SubTreeXfmrYangToDb = func(inParams XfmrP
 			intfObj.Ethernet.Config == nil ||
 			//case 3
 			(intfObj.Ethernet.Config != nil && requestUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config") {
+
+			// Delete all the Vlans for Interface and member port removal from port-channel
+			lagId, err := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+			if lagId != nil {
+				log.Infof("%s is member of %s", ifName, *lagId)
+			}
+			if err != nil {
+				errStr := "Retrieveing PortChannel associated with Interface: " + ifName + " failed!"
+				return nil, errors.New(errStr)
+			}
+			if lagId != nil {
+				lagStr = *lagId
+				intTbl := IntfTypeTblMap[IntfTypePortChannel]
+				tblName, _ := getMemTableNameByDBId(intTbl, inParams.curDb)
+
+				m := make(map[string]string)
+				value := db.Value{Field: m}
+				m["NULL"] = "NULL"
+				intfKey := lagStr + "|" + ifName
+				if _, ok := memMap[tblName]; !ok {
+					memMap[tblName] = make(map[string]db.Value)
+				}
+				memMap[tblName][intfKey] = value
+			}
 			return memMap, err
+		}
+	}
+
+	/* Handle AggregateId config */
+	if intfObj.Ethernet.Config.AggregateId != nil {
+		if !strings.HasPrefix(ifName, ETHERNET) {
+			return nil, errors.New("Invalid config request")
+		}
+		intTbl := IntfTypeTblMap[IntfTypePortChannel]
+		tblName, _ := getMemTableNameByDBId(intTbl, inParams.curDb)
+
+		switch inParams.oper {
+		case CREATE:
+			fallthrough
+		case REPLACE:
+			fallthrough
+		case UPDATE:
+			log.Info("Add member port")
+			lagId := intfObj.Ethernet.Config.AggregateId
+			lagStr = *lagId
+
+			intfType, _, err := getIntfTypeByName(ifName)
+			if intfType != IntfTypeEthernet || err != nil {
+				intfTypeStr := strconv.Itoa(int(intfType))
+				errStr := "Invalid interface type" + intfTypeStr
+				log.Error(errStr)
+				return nil, tlerr.InvalidArgsError{Format: errStr}
+			}
+			/* Check if PortChannel exists */
+			err = validateIntfExists(inParams.d, intTbl.cfgDb.portTN, lagStr)
+			if err != nil {
+				return nil, err
+			}
+
+		case DELETE:
+			lagId, err := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+			if lagId != nil {
+				log.Infof("%s is member of %s", ifName, *lagId)
+			}
+			if lagId == nil || err != nil {
+				return nil, nil
+			}
+			lagStr = *lagId
+		} /* End of switch case */
+		if len(lagStr) != 0 {
+			m := make(map[string]string)
+			value := db.Value{Field: m}
+			m["NULL"] = "NULL"
+			intfKey := lagStr + "|" + ifName
+			if _, ok := memMap[tblName]; !ok {
+				memMap[tblName] = make(map[string]db.Value)
+			}
+			memMap[tblName][intfKey] = value
 		}
 	}
 
@@ -756,6 +835,26 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 		}
 		var errStr string
 
+		if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id" {
+			is_id_populated := false
+			intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &ifName)
+			if intf_lagId != nil {
+				if strings.HasPrefix(*intf_lagId, "PortChannel") {
+					intfObj.Ethernet.Config.AggregateId = intf_lagId
+					is_id_populated = true
+				}
+			}
+			if !is_id_populated {
+				errStr = "aggregate-id not set"
+			}
+
+			// subscribe for aggregate-id needs "Resource not found" for delete notification
+			if (targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id") && (!is_id_populated) {
+				err = tlerr.NotFoundError{Format: "Resource not found"}
+				return err
+			}
+		}
+
 		if entry.IsPopulated() {
 			if get_cfg_obj || targetUriPath == "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/config/auto-negotiate" {
 				autoNeg, ok := entry.Field[PORT_AUTONEG]
@@ -848,6 +947,35 @@ var DbToYang_intf_eth_port_speed_xfmr FieldXfmrDbtoYang = func(inParams XfmrPara
 	} else {
 		log.Info("Speed field not found in DB")
 	}
+
+	return result, err
+}
+
+var DbToYang_intf_eth_aggr_id_xfmr = func(inParams XfmrParams) (map[string]interface{}, error) {
+	var err error
+	result := make(map[string]interface{})
+
+	log.Info("DbToYang_intf_eth_aggr_id_xfmr, interface name ", inParams.key)
+
+	intfType, _, ierr := getIntfTypeByName(inParams.key)
+	if intfType == IntfTypeUnset || ierr != nil {
+		log.Info("DbToYang_intf_eth_aggr_id_xfmr - Invalid interface type IntfTypeUnset")
+		return result, errors.New("Invalid interface type IntfTypeUnset")
+	}
+
+	if IntfTypeEthernet != intfType {
+		return result, nil
+	}
+
+	intf_lagId, _ := retrievePortChannelAssociatedWithIntf(&inParams, &inParams.key)
+	if intf_lagId != nil {
+		lagPrefix := "PortChannel"
+		if strings.HasPrefix(*intf_lagId, lagPrefix) {
+			result["aggregate-id"] = intf_lagId
+		}
+	}
+
+	log.Infof("DbToYang_intf_eth_aggr_id_xfmr result %v", result)
 
 	return result, err
 }
