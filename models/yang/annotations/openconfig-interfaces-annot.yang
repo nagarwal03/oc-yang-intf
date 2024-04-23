@@ -46,6 +46,7 @@ module openconfig-interfaces-annot {
         deviate add {
             sonic-ext:field-transformer "intf_eth_aggr_id_xfmr";
         }
+    }
 
     deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state {
         deviate add {
