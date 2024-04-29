@@ -36,8 +36,6 @@ func init() {
 	XlateFuncBind("YangToDb_lag_min_links_xfmr", YangToDb_lag_min_links_xfmr)
 	XlateFuncBind("DbToYang_lag_min_links_xfmr", DbToYang_lag_min_links_xfmr)
 	XlateFuncBind("DbToYang_intf_lag_state_xfmr", DbToYang_intf_lag_state_xfmr)
-	//XlateFuncBind("Subscribe_intf_lag_state_xfmr", Subscribe_intf_lag_state_xfmr)
-	XlateFuncBind("DbToYangPath_intf_lag_state_path_xfmr", DbToYangPath_intf_lag_state_path_xfmr)
 }
 
 const (
@@ -428,32 +426,6 @@ var DbToYang_intf_lag_state_xfmr SubTreeXfmrDbToYang = func(inParams XfmrParams)
 		log.Infof(targetUriPath + " - Not an supported Get attribute")
 	}
 	return err
-}
-
-var DbToYangPath_intf_lag_state_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
-	intfRoot := "/openconfig-interfaces:interfaces/interface"
-
-	if (params.tblName != "PORTCHANNEL") &&
-		(params.tblName != "PORTCHANNEL_MEMBER") &&
-		(params.tblName != "LAG_TABLE") {
-		log.Info("DbToYangPath_intf_lag_state_path_xfmr: from wrong table ", params.tblName)
-		return nil
-	}
-
-	if (params.tblName == "PORTCHANNEL") && (len(params.tblKeyComp) > 0) {
-		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
-	} else if (params.tblName == "PORTCHANNEL_MEMBER") && (len(params.tblKeyComp) > 1) {
-		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
-	} else if (params.tblName == "LAG_TABLE") && (len(params.tblKeyComp) > 0) {
-		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
-	} else {
-		log.Info("DbToYangPath_intf_lag_state_path_xfmr, wrong param: tbl ", params.tblName, " key ", params.tblKeyComp)
-		return nil
-	}
-
-	log.Info("DbToYangPath_intf_lag_state_path_xfmr: params.ygPathkeys: ", params.ygPathKeys)
-
-	return nil
 }
 
 func updateMemberPortsMtu(inParams *XfmrParams, lagName *string, mtuValStr *string) error {
