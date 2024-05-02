@@ -47,6 +47,8 @@ func init() {
 	XlateFuncBind("DbToYang_intf_enabled_xfmr", DbToYang_intf_enabled_xfmr)
 	XlateFuncBind("YangToDb_intf_eth_port_config_xfmr", YangToDb_intf_eth_port_config_xfmr)
 	XlateFuncBind("DbToYang_intf_eth_port_config_xfmr", DbToYang_intf_eth_port_config_xfmr)
+	XlateFuncBind("Subscribe_intf_eth_port_config_xfmr", Subscribe_intf_eth_port_config_xfmr)
+	XlateFuncBind("DbToYangPath_intf_eth_port_config_path_xfmr", DbToYangPath_intf_eth_port_config_path_xfmr)
 	XlateFuncBind("DbToYang_intf_eth_auto_neg_xfmr", DbToYang_intf_eth_auto_neg_xfmr)
 	XlateFuncBind("DbToYang_intf_eth_port_speed_xfmr", DbToYang_intf_eth_port_speed_xfmr)
 
@@ -284,6 +286,30 @@ var intf_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string, error) 
 		} else {
 			return dbIdToTblMap[inParams.curDb], nil
 		}
+	}
+	if (ifName == "*") && (inParams.oper == SUBSCRIBE) {
+		log.Info("intf_table_xfmr * ifName subscribe with targetUriPath ", targetUriPath)
+
+		// need to check if to add subinterface tbl !!!!
+		if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/config") {
+			tblList = append(tblList, "PORT")
+		} else if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/state") {
+			tblList = append(tblList, "PORT_TABLE")
+		} else if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state") {
+			tblList = append(tblList, "PORT_TABLE")
+		} else {
+			if _, ok := dbIdToTblMap[inParams.curDb]; !ok {
+				if log.V(3) {
+					log.Info("TableXfmrFunc - intf_table_xfmr db id entry not present")
+				}
+				return tblList, errors.New("Key not present")
+			} else {
+				return dbIdToTblMap[inParams.curDb], nil
+			}
+		}
+
+		log.Infof("intf_table_xfmr for * ifName tbllist %v", tblList)
+		return tblList, nil
 	}
 
 	intfType, _, ierr := getIntfTypeByName(ifName)
@@ -782,6 +808,62 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 
 	return err
 }
+var Subscribe_intf_eth_port_config_xfmr SubTreeXfmrSubscribe = func(inParams XfmrSubscInParams) (XfmrSubscOutParams, error) {
+	var err error
+	var result XfmrSubscOutParams
+
+	if inParams.subscProc == TRANSLATE_SUBSCRIBE {
+		log.Info("Subscribe_intf_eth_port_config_xfmr: inParams.subscProc: ", inParams.subscProc)
+
+		pathInfo := NewPathInfo(inParams.uri)
+		targetUriPath := pathInfo.YangPath
+
+		log.Infof("Subscribe_intf_eth_port_config_xfmr:- URI:%s pathinfo:%s ", inParams.uri, pathInfo.Path)
+		log.Infof("Subscribe_intf_eth_port_config_xfmr:- Target URI path:%s", targetUriPath)
+
+		// to handle the TRANSLATE_SUBSCRIBE
+		result.nOpts = new(notificationOpts)
+		result.nOpts.pType = OnChange
+		result.nOpts.mInterval = 15
+		result.isVirtualTbl = false
+		result.needCache = true
+
+		ifName := pathInfo.Var("name")
+		log.Info("Subscribe_intf_eth_port_config_xfmr: ifName: ", ifName)
+
+		if ifName == "" {
+			ifName = "*"
+		}
+
+		result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {
+			"PORT": {ifName: {"autoneg": "auto-negotiate", "adv_speeds": "advertised-speed", "link_training": "standalone-link-training", "unreliable_los": "unreliable-los", "speed": "port-speed", "fec": "port-fec"}}}}
+
+		log.Info("Subscribe_intf_eth_port_config_xfmr: result ", result)
+	}
+	return result, err
+}
+
+var DbToYangPath_intf_eth_port_config_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
+	log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: params: ", params)
+
+	intfRoot := "/openconfig-interfaces:interfaces/interface"
+
+	if params.tblName != "PORT" {
+		log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: from wrong table: ", params.tblName)
+		return nil
+	}
+
+	if (params.tblName == "PORT") && (len(params.tblKeyComp) > 0) {
+		params.ygPathKeys[intfRoot+"/name"] = *(&params.tblKeyComp[0])
+	} else {
+		log.Info("DbToYangPath_intf_eth_port_config_path_xfmr, wrong param: tbl ", params.tblName, " key ", params.tblKeyComp)
+		return nil
+	}
+
+	log.Info("DbToYangPath_intf_eth_port_config_path_xfmr: params.ygPathkeys: ", params.ygPathKeys)
+
+	return nil
+}
 
 var DbToYang_intf_eth_auto_neg_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
 	var err error
@@ -914,7 +996,46 @@ var intf_subintfs_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string
 	var tblList []string
 
 	pathInfo := NewPathInfo(inParams.uri)
+	ifName := pathInfo.Var("name")
 	idx := pathInfo.Var("index")
+
+	if inParams.oper == SUBSCRIBE {
+		var _intfTypeList []E_InterfaceType
+
+		_addSubIntfToList := func() {
+			if idx == "*" || idx != "0" {
+				err_str := "Subinterfaces not supported"
+				return tblList, tlerr.NotSupported(err_str)
+			}
+		}
+
+		if ifName == "*" {
+			_intfTypeList = append(_intfTypeList, IntfTypeEthernet)
+			_addSubIntfToList()
+		} else {
+			_ifType, _, _err := getIntfTypeByName(ifName)
+			if _ifType == IntfTypeUnset || _err != nil {
+				return tblList, errors.New("Invalid interface type IntfTypeUnset")
+			}
+			_intfTypeList = append(_intfTypeList, _ifType)
+			_addSubIntfToList()
+		}
+
+		for _, _ifType := range _intfTypeList {
+			_intfTblName, _ := getIntfTableNameByDBId(IntfTypeTblMap[_ifType], inParams.curDb)
+			tblList = append(tblList, _intfTblName)
+		}
+
+		log.V(3).Info("intf_subintfs_table_xfmr: URI: ", inParams.uri, " OP:", inParams.oper, " ifName:", ifName, " idx:", idx, " tblList:", tblList)
+		return tblList, nil
+	}
+
+	intfType, _, ierr := getIntfTypeByName(ifName)
+	if intfType == IntfTypeUnset || ierr != nil {
+		return tblList, errors.New("Invalid interface type IntfTypeUnset")
+	}
+
+	log.Info("intf_subintfs_table_xfmr: URI: ", inParams.uri)
 
 	if idx == "" {
 		if inParams.oper == GET || inParams.oper == DELETE {
@@ -973,11 +1094,14 @@ var YangToDb_intf_subintfs_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (str
 
 	log.Info("YangToDb_intf_subintfs_xfmr: i32: %s", i32)
 
-	if i32 != 0 {
+	if idx != "0" && idx != "*" && idx != "" {
 		err_str := "Subinterfaces not supported"
 		return subintf_key, tlerr.NotSupported(err_str)
+	} else if inParams.oper == SUBSCRIBE && idx == "0" {
+		subintf_key = ifName
+	} else { /* For get 0 index case & subscribe index * case */
+		subintf_key = idx
 	}
-	subintf_key = idx
 
 	log.Info("YangToDb_intf_subintfs_xfmr - return subintf_key ", subintf_key)
 	return subintf_key, err
@@ -2005,6 +2129,7 @@ var Subscribe_intf_ip_addr_xfmr = func(inParams XfmrSubscInParams) (XfmrSubscOut
 	if log.V(3) {
 		log.Info("Entering Subscribe_intf_ip_addr_xfmr")
 	}
+	var err error
 	var result XfmrSubscOutParams
 
 	pathInfo := NewPathInfo(inParams.uri)
@@ -2012,10 +2137,151 @@ var Subscribe_intf_ip_addr_xfmr = func(inParams XfmrSubscInParams) (XfmrSubscOut
 
 	log.Infof("Subscribe_intf_ip_addr_xfmr:- subscProc:%v URI: %s", inParams.subscProc, inParams.uri)
 	log.Infof("Subscribe_intf_ip_addr_xfmr:- Target URI path: %s", origTargetUriPath)
-	// Defer the DB resource check done by infra by setting the virtual table to true.
-	// Resource checks are now performed within the DbToYang or YangToDb subtree callback.
-	result.isVirtualTbl = true
-	return result, nil
+
+	// When the subscribe subtree is invoked in the GET or CRUD context the inParams.subscProc is set to TRANSLATE_EXISTS
+	if inParams.subscProc == TRANSLATE_EXISTS {
+		// Defer the DB resource check done by infra by setting the virtual table to true.
+		// Resource checks are now performed within the DbToYang or YangToDb subtree callback.
+		result.isVirtualTbl = true
+		return result, nil
+	}
+	if inParams.subscProc == TRANSLATE_SUBSCRIBE {
+
+		ifBasePath := "/openconfig-interfaces:interfaces/interface"
+		targetUriPath := origTargetUriPath[len(ifBasePath):]
+
+		if strings.HasPrefix(targetUriPath, "/subinterfaces") {
+			targetUriPath = targetUriPath[len("/subinterfaces/subinterface"):]
+		}
+		if strings.HasPrefix(targetUriPath, "/openconfig-if-ip:ipv4") {
+			targetUriPath = targetUriPath[len("/openconfig-if-ip:ipv4/addresses"):]
+		} else {
+			targetUriPath = targetUriPath[len("/openconfig-if-ip:ipv6/addresses"):]
+		}
+
+		if targetUriPath == "" || targetUriPath == "/address" {
+			result.isVirtualTbl = true
+			log.Info("Subscribe_intf_ip_addr_xfmr:- result.isVirtualTbl: ", result.isVirtualTbl)
+			return result, err
+		}
+
+		result.onChange = OnchangeEnable
+		result.nOpts = &notificationOpts{}
+		result.nOpts.pType = OnChange
+		result.isVirtualTbl = false
+
+		uriIfName := pathInfo.Var("name")
+		tableName := ""
+		ipKey := ""
+		ifKey := ""
+
+		if uriIfName == "" || uriIfName == "*" {
+			ifKey = "*"
+		} else {
+			sonicIfName := &uriIfName
+			ifKey = *sonicIfName
+		}
+
+		addressConfigPath := "/address/config"
+		addressStatePath := "/address/state"
+
+		idx := pathInfo.Var("index")
+		if ifKey != "" {
+			if idx == "0" {
+				intfType, _, _ := getIntfTypeByName(ifKey)
+				intTbl := IntfTypeTblMap[intfType]
+				if targetUriPath == addressStatePath {
+					tableName = intTbl.appDb.intfTN
+				} else {
+					tableName = intTbl.cfgDb.intfTN
+				}
+			} else {
+				err_str := "Subinterfaces not supported"
+				return XfmrSubscOutParams, tlerr.NotSupported(err_str)
+			}
+		}
+
+		ipKey = pathInfo.Var("ip")
+		if ipKey == "" {
+			ipKey = "*"
+		}
+
+		if ipKey != "*" {
+			ipKey = ipKey + "/*"
+		}
+
+		log.Infof("path:%v ifKey:%v, ipKey:%v tbl:[%v]", origTargetUriPath, ifKey, ipKey, tableName)
+
+		ipKey = pathInfo.Var("ip")
+		if ipKey == "" {
+			ipKey = "*"
+		}
+
+		if ipKey != "*" {
+			ipKey = ipKey + "/*"
+		}
+
+		log.Infof("path:%v ifKey:%v, ipKey:%v tbl:[%v]", origTargetUriPath, ifKey, ipKey, tableName)
+
+		ipKey = pathInfo.Var("ip")
+		if ipKey == "" {
+			ipKey = "*"
+		}
+
+		if ipKey != "*" {
+			ipKey = ipKey + "/*"
+		}
+
+		log.Infof("path:%v ifKey:%v, ipKey:%v tbl:[%v]", origTargetUriPath, ifKey, ipKey, tableName)
+
+		keyName := ""
+		if targetUriPath == addressConfigPath {
+			keyName = ifKey + "|" + ipKey
+			if tableName != "" {
+				result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {tableName: {keyName: {}}}}
+			} else {
+				result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {"INTERFACE": {keyName: {}}}}
+			}
+		} else if targetUriPath == addressStatePath {
+			keyName = ifKey + ":" + ipKey
+			if tableName != "" {
+				result.dbDataMap = RedisDbSubscribeMap{db.ApplDB: {tableName: {keyName: {KEY_COMP_CNT: "2", DEL_AS_UPDATE: "true"}}}}
+			} else {
+				result.dbDataMap = RedisDbSubscribeMap{db.ApplDB: {"INTF_TABLE": {keyName: {KEY_COMP_CNT: "2", DEL_AS_UPDATE: "true"}}}}
+			}
+		}
+
+		log.Info("Subscribe_intf_ip_addr_xfmr:- result dbDataMap: ", result.dbDataMap)
+		log.Info("Subscribe_intf_ip_addr_xfmr:- result secDbDataMap: ", result.secDbDataMap)
+
+		return result, err
+	}
+	result.isVirtualTbl = false
+	result.dbDataMap = make(RedisDbSubscribeMap)
+	uriIfName := pathInfo.Var("name")
+	idx := pathInfo.Var("index")
+	sonicIfName := &uriIfName
+	keyName := *sonicIfName
+
+	if keyName != "" {
+		intfType, _, _ := getIntfTypeByName(keyName)
+		intTbl := IntfTypeTblMap[intfType]
+		tblName := intTbl.cfgDb.intfTN
+		if idx != "" && idx != "0" {
+			err_str := "Subinterfaces not supported"
+			return result, tlerr.NotSupported(err_str)
+		}
+		result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {tblName: {keyName: {}}}}
+	}
+	log.Info("Returning Subscribe_intf_ip_addr_xfmr, result:", result)
+
+	result.needCache = true
+	result.nOpts = new(notificationOpts)
+	result.nOpts.mInterval = 15
+	result.nOpts.pType = OnChange
+	log.Info("Returning Subscribe_intf_ip_addr_xfmr, result:", result)
+	return result, err
+
 }
 
 // YangToDb_subintf_ipv6_tbl_key_xfmr is a YangToDB Key transformer for IPv6 config.
