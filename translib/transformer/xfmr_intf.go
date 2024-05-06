@@ -51,11 +51,7 @@ func init() {
 	XlateFuncBind("DbToYang_intf_eth_port_speed_xfmr", DbToYang_intf_eth_port_speed_xfmr)
 
 	XlateFuncBind("DbToYang_intf_get_counters_xfmr", DbToYang_intf_get_counters_xfmr)
-	//XlateFuncBind("Subscribe_intf_get_counters_xfmr", Subscribe_intf_get_counters_xfmr)
-	//XlateFuncBind("DbToYangPath_intf_get_counters_path_xfmr", DbToYangPath_intf_get_counters_path_xfmr)
-
 	XlateFuncBind("DbToYang_intf_get_ether_counters_xfmr", DbToYang_intf_get_ether_counters_xfmr)
-	//XlateFuncBind("Subscribe_intf_get_ether_counters_xfmr", Subscribe_intf_get_ether_counters_xfmr)
 
 	XlateFuncBind("YangToDb_intf_subintfs_xfmr", YangToDb_intf_subintfs_xfmr)
 	XlateFuncBind("DbToYang_intf_subintfs_xfmr", DbToYang_intf_subintfs_xfmr)
@@ -885,7 +881,7 @@ func getIntfCountersTblKey(d *db.DB, ifKey string) (string, error) {
 	return oid, err
 }
 
-func getCounters(entry *db.Value, entry_backup *db.Value, attr string, counter_val **uint64) error {
+func getCounters(entry *db.Value, attr string, counter_val **uint64) error {
 
 	var ok bool = false
 	var err error
@@ -893,16 +889,10 @@ func getCounters(entry *db.Value, entry_backup *db.Value, attr string, counter_v
 	if !ok {
 		return errors.New("Attr " + attr + "doesn't exist in IF table Map!")
 	}
-	val2, ok := entry_backup.Field[attr]
-	if !ok {
-		return errors.New("Attr " + attr + "doesn't exist in IF backup table Map!")
-	}
 
 	if len(val1) > 0 {
 		v, _ := strconv.ParseUint(val1, 10, 64)
-		v_backup, _ := strconv.ParseUint(val2, 10, 64)
-		val := v - v_backup
-		*counter_val = &val
+		*counter_val = &v
 		return nil
 	}
 	return err
@@ -916,7 +906,7 @@ var etherCntList []string = []string{"in-oversize-frames", "in-undersize-frames"
 var etherCntInList []string = []string{"in-frames-64-octets", "in-frames-65-127-octets", "in-frames-128-255-octets",
 	"in-frames-256-511-octets", "in-frames-512-1023-octets", "in-frames-1024-1518-octets"}
 
-func getSpecificCounterAttr(targetUriPath string, entry *db.Value, entry_backup *db.Value, counter interface{}) (bool, error) {
+func getSpecificCounterAttr(targetUriPath string, entry *db.Value, counter interface{}) (bool, error) {
 
 	var e error
 	var counter_val *ocbinds.OpenconfigInterfaces_Interfaces_Interface_State_Counters
@@ -930,36 +920,36 @@ func getSpecificCounterAttr(targetUriPath string, entry *db.Value, entry_backup 
 
 	switch targetUriPath {
 	case "/openconfig-interfaces:interfaces/interface/state/counters/in-octets":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_OCTETS", &counter_val.InOctets)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_IN_OCTETS", &counter_val.InOctets)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/in-unicast-pkts":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_UCAST_PKTS", &counter_val.InUnicastPkts)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_IN_UCAST_PKTS", &counter_val.InUnicastPkts)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/in-broadcast-pkts":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_BROADCAST_PKTS", &counter_val.InBroadcastPkts)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_IN_BROADCAST_PKTS", &counter_val.InBroadcastPkts)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/in-multicast-pkts":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_MULTICAST_PKTS", &counter_val.InMulticastPkts)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_IN_MULTICAST_PKTS", &counter_val.InMulticastPkts)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/in-errors":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_ERRORS", &counter_val.InErrors)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_IN_ERRORS", &counter_val.InErrors)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/in-discards":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_DISCARDS", &counter_val.InDiscards)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_IN_DISCARDS", &counter_val.InDiscards)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/in-pkts":
 		var inNonUCastPkt, inUCastPkt *uint64
 		var in_pkts uint64
 
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_NON_UCAST_PKTS", &inNonUCastPkt)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_IN_NON_UCAST_PKTS", &inNonUCastPkt)
 		if e == nil {
-			e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_IN_UCAST_PKTS", &inUCastPkt)
+			e = getCounters(entry, "SAI_PORT_STAT_IF_IN_UCAST_PKTS", &inUCastPkt)
 			if e != nil {
 				return true, e
 			}
@@ -971,42 +961,36 @@ func getSpecificCounterAttr(targetUriPath string, entry *db.Value, entry_backup 
 		}
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/out-octets":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_OCTETS", &counter_val.OutOctets)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_OCTETS", &counter_val.OutOctets)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/out-unicast-pkts":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_UCAST_PKTS", &counter_val.OutUnicastPkts)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_UCAST_PKTS", &counter_val.OutUnicastPkts)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/out-broadcast-pkts":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_BROADCAST_PKTS", &counter_val.OutBroadcastPkts)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_BROADCAST_PKTS", &counter_val.OutBroadcastPkts)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/out-multicast-pkts":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_MULTICAST_PKTS", &counter_val.OutMulticastPkts)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_MULTICAST_PKTS", &counter_val.OutMulticastPkts)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/out-errors":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_ERRORS", &counter_val.OutErrors)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_ERRORS", &counter_val.OutErrors)
 		return true, e
 
 	case "/openconfig-interfaces:interfaces/interface/state/counters/out-discards":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_DISCARDS", &counter_val.OutDiscards)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_DISCARDS", &counter_val.OutDiscards)
 		return true, e
 
-	//case "/openconfig-interfaces:interfaces/interface/state/counters/last-clear":
-	//	timestampStr := (entry_backup.Field["LAST_CLEAR_TIMESTAMP"])
-	//	timestamp, _ := strconv.ParseUint(timestampStr, 10, 64)
-	//	counter_val.LastClear = &timestamp
-	//	return true, e
-	//
 	case "/openconfig-interfaces:interfaces/interface/state/counters/out-pkts":
 		var outNonUCastPkt, outUCastPkt *uint64
 		var out_pkts uint64
 
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_NON_UCAST_PKTS", &outNonUCastPkt)
+		e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_NON_UCAST_PKTS", &outNonUCastPkt)
 		if e == nil {
-			e = getCounters(entry, entry_backup, "SAI_PORT_STAT_IF_OUT_UCAST_PKTS", &outUCastPkt)
+			e = getCounters(entry, "SAI_PORT_STAT_IF_OUT_UCAST_PKTS", &outUCastPkt)
 			if e != nil {
 				return true, e
 			}
@@ -1019,44 +1003,44 @@ func getSpecificCounterAttr(targetUriPath string, entry *db.Value, entry_backup 
 
 	case "/openconfig-interfaces:interfaces/interface/ethernet/state/counters/in-oversize-frames",
 		"/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/in-oversize-frames":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_RX_OVERSIZE_PKTS", &eth_counter_val.InOversizeFrames)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_RX_OVERSIZE_PKTS", &eth_counter_val.InOversizeFrames)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/ethernet/state/counters/in-undersize-frames",
 		"/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/in-undersize-frames":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_STATS_UNDERSIZE_PKTS", &eth_counter_val.InUndersizeFrames)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_STATS_UNDERSIZE_PKTS", &eth_counter_val.InUndersizeFrames)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/ethernet/state/counters/in-jabber-frames",
 		"/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/in-jabber-frames":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_STATS_JABBERS", &eth_counter_val.InJabberFrames)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_STATS_JABBERS", &eth_counter_val.InJabberFrames)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/ethernet/state/counters/in-fragment-frames",
 		"/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/in-fragment-frames":
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_STATS_FRAGMENTS", &eth_counter_val.InFragmentFrames)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_STATS_FRAGMENTS", &eth_counter_val.InFragmentFrames)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution/in-frames-64-octets":
 		ygot.BuildEmptyTree(eth_counter_val)
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_IN_PKTS_64_OCTETS", &eth_counter_val.InDistribution.InFrames_64Octets)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_IN_PKTS_64_OCTETS", &eth_counter_val.InDistribution.InFrames_64Octets)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution/in-frames-65-127-octets":
 		ygot.BuildEmptyTree(eth_counter_val)
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_IN_PKTS_65_TO_127_OCTETS", &eth_counter_val.InDistribution.InFrames_65_127Octets)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_IN_PKTS_65_TO_127_OCTETS", &eth_counter_val.InDistribution.InFrames_65_127Octets)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution/in-frames-128-255-octets",
 		"/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution/in-frames-128-255-octets":
 		ygot.BuildEmptyTree(eth_counter_val)
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_IN_PKTS_128_TO_255_OCTETS", &eth_counter_val.InDistribution.InFrames_128_255Octets)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_IN_PKTS_128_TO_255_OCTETS", &eth_counter_val.InDistribution.InFrames_128_255Octets)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution/in-frames-256-511-octets":
 		ygot.BuildEmptyTree(eth_counter_val)
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_IN_PKTS_256_TO_511_OCTETS", &eth_counter_val.InDistribution.InFrames_256_511Octets)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_IN_PKTS_256_TO_511_OCTETS", &eth_counter_val.InDistribution.InFrames_256_511Octets)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution/in-frames-512-1023-octets":
 		ygot.BuildEmptyTree(eth_counter_val)
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_IN_PKTS_512_TO_1023_OCTETS", &eth_counter_val.InDistribution.InFrames_512_1023Octets)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_IN_PKTS_512_TO_1023_OCTETS", &eth_counter_val.InDistribution.InFrames_512_1023Octets)
 		return true, e
 	case "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution/in-frames-1024-1518-octets":
 		ygot.BuildEmptyTree(eth_counter_val)
-		e = getCounters(entry, entry_backup, "SAI_PORT_STAT_ETHER_IN_PKTS_1024_TO_1518_OCTETS", &eth_counter_val.InDistribution.InFrames_1024_1518Octets)
+		e = getCounters(entry, "SAI_PORT_STAT_ETHER_IN_PKTS_1024_TO_1518_OCTETS", &eth_counter_val.InDistribution.InFrames_1024_1518Octets)
 		return true, e
 
 	default:
@@ -1142,25 +1126,12 @@ var populatePortCounters PopulateIntfCounters = func(inParams XfmrParams, counte
 		return dbErr
 	}
 	CounterData := entry
-	cntTs_cp := &db.TableSpec{Name: "COUNTERS_BACKUP"}
-	entry_backup, dbErr := inParams.dbs[inParams.curDb].GetEntry(cntTs_cp, db.Key{Comp: []string{oid}})
-	if dbErr != nil {
-		m := make(map[string]string)
-		log.Info("PopulateIntfCounters : not able find the oid entry in DB COUNTERS_BACKUP table")
-		/* Frame backup data with 0 as counter values */
-		for attr := range entry.Field {
-			m[attr] = "0"
-		}
-		m["LAST_CLEAR_TIMESTAMP"] = "0"
-		entry_backup = db.Value{Field: m}
-	}
-	CounterBackUpData := entry_backup
 
 	switch targetUriPath {
 	case "/openconfig-interfaces:interfaces/interface/state/counters":
 		for _, attr := range portCntList {
 			uri := targetUriPath + "/" + attr
-			if ok, err := getSpecificCounterAttr(uri, &CounterData, &CounterBackUpData, counter); !ok || err != nil {
+			if ok, err := getSpecificCounterAttr(uri, &CounterData, counter); !ok || err != nil {
 				log.Info("Get Counter URI failed :", uri)
 				//err = errors.New("Get Counter URI failed")
 			}
@@ -1169,7 +1140,7 @@ var populatePortCounters PopulateIntfCounters = func(inParams XfmrParams, counte
 		"/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters":
 		for _, attr := range etherCntList {
 			uri := targetUriPath + "/" + attr
-			if ok, err := getSpecificCounterAttr(uri, &CounterData, &CounterBackUpData, counter); !ok || err != nil {
+			if ok, err := getSpecificCounterAttr(uri, &CounterData, counter); !ok || err != nil {
 				log.Info("Get Ethernet Counter URI failed :", uri)
 				//err = errors.New("Get Ethernet Counter URI failed")
 			}
@@ -1180,13 +1151,13 @@ var populatePortCounters PopulateIntfCounters = func(inParams XfmrParams, counte
 		"/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters/openconfig-if-ethernet-ext:in-distribution":
 		for _, attr := range etherCntInList {
 			uri := targetUriPath + "/" + attr
-			if ok, err := getSpecificCounterAttr(uri, &CounterData, &CounterBackUpData, counter); !ok || err != nil {
+			if ok, err := getSpecificCounterAttr(uri, &CounterData, counter); !ok || err != nil {
 				log.Info("Get Ethernet Counter URI failed :", uri)
 			}
 		}
 
 	default:
-		_, err = getSpecificCounterAttr(targetUriPath, &CounterData, &CounterBackUpData, counter)
+		_, err = getSpecificCounterAttr(targetUriPath, &CounterData, counter)
 	}
 
 	return err
