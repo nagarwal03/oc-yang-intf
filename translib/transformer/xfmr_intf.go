@@ -52,6 +52,9 @@ func init() {
 
 	XlateFuncBind("DbToYang_intf_get_counters_xfmr", DbToYang_intf_get_counters_xfmr)
 	XlateFuncBind("DbToYang_intf_get_ether_counters_xfmr", DbToYang_intf_get_ether_counters_xfmr)
+	XlateFuncBind("Subscribe_intf_get_counters_xfmr", Subscribe_intf_get_counters_xfmr)
+	XlateFuncBind("DbToYangPath_intf_get_counters_path_xfmr", DbToYangPath_intf_get_counters_path_xfmr)
+	XlateFuncBind("Subscribe_intf_get_ether_counters_xfmr", Subscribe_intf_get_ether_counters_xfmr)
 
 	XlateFuncBind("YangToDb_intf_subintfs_xfmr", YangToDb_intf_subintfs_xfmr)
 	XlateFuncBind("DbToYang_intf_subintfs_xfmr", DbToYang_intf_subintfs_xfmr)
@@ -1102,6 +1105,70 @@ var DbToYang_intf_get_counters_xfmr SubTreeXfmrDbToYang = func(inParams XfmrPara
 	}
 
 	return err
+}
+
+var Subscribe_intf_get_counters_xfmr SubTreeXfmrSubscribe = func(inParams XfmrSubscInParams) (XfmrSubscOutParams, error) {
+	var err error
+	var result XfmrSubscOutParams
+
+	if inParams.subscProc == TRANSLATE_SUBSCRIBE {
+		log.Info("Subscribe_intf_get_counters_xfmr: inParams.subscProc: ", inParams.subscProc)
+
+		pathInfo := NewPathInfo(inParams.uri)
+		targetUriPath := pathInfo.YangPath
+
+		log.Infof("Subscribe_intf_get_counters_xfmr:- URI:%s pathinfo:%s ", inParams.uri, pathInfo.Path)
+		log.Infof("Subscribe_intf_get_counters_xfmr:- Target URI path:%s", targetUriPath)
+
+		// to handle the TRANSLATE_SUBSCRIBE
+		result.nOpts = new(notificationOpts)
+		result.nOpts.pType = Sample
+		result.nOpts.mInterval = 30
+		result.isVirtualTbl = false
+		result.needCache = true
+
+		ifName := pathInfo.Var("name")
+		log.Info("Subscribe_intf_get_counters_xfmr: ifName: ", ifName)
+
+		if ifName == "" || ifName == "*" {
+			if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/openconfig-if-ethernet:ethernet/state/counters") {
+				ifName = "Eth" + "*"
+			} else {
+				ifName = "*"
+			}
+		}
+
+		result.dbDataMap = RedisDbSubscribeMap{db.CountersDB: {"COUNTERS_PORT_NAME_MAP": {"": {FIELD_CURSOR: ifName}}}}
+
+		log.Info("Subscribe_intf_eth_port_config_xfmr: result ", result)
+	}
+	return result, err
+}
+
+var DbToYangPath_intf_get_counters_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
+	log.Info("DbToYangPath_intf_get_counters_path_xfmr: params: ", params)
+
+	intfRoot := "/openconfig-interfaces:interfaces/interface"
+
+	if params.tblName != "COUNTERS_PORT_NAME_MAP" {
+		log.Info("DbToYangPath_intf_get_counters_path_xfmr: from wrong table: ", params.tblName)
+		return nil
+	}
+
+	if (params.tblName == "COUNTERS_PORT_NAME_MAP") && (len(params.tblKeyComp) > 0) {
+		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
+	} else {
+		log.Info("DbToYangPath_intf_get_counters_path_xfmr, wrong param: tbl ", params.tblName, " key ", params.tblKeyComp)
+		return nil
+	}
+
+	log.Info("DbToYangPath_intf_get_counters_path_xfmr: params.ygPathkeys: ", params.ygPathKeys)
+
+	return nil
+}
+
+var Subscribe_intf_get_ether_counters_xfmr SubTreeXfmrSubscribe = func(inParams XfmrSubscInParams) (XfmrSubscOutParams, error) {
+	return Subscribe_intf_get_counters_xfmr(inParams)
 }
 
 var populatePortCounters PopulateIntfCounters = func(inParams XfmrParams, counter interface{}) error {
