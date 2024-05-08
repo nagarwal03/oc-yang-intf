@@ -994,7 +994,6 @@ var intf_pre_xfmr PreXfmrFunc = func(inParams XfmrParams) error {
 
 var intf_subintfs_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string, error) {
 	var tblList []string
-
 	pathInfo := NewPathInfo(inParams.uri)
 	ifName := pathInfo.Var("name")
 	idx := pathInfo.Var("index")
@@ -1002,23 +1001,19 @@ var intf_subintfs_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string
 	if inParams.oper == SUBSCRIBE {
 		var _intfTypeList []E_InterfaceType
 
-		_addSubIntfToList := func() {
-			if idx == "*" || idx != "0" {
-				err_str := "Subinterfaces not supported"
-				return tblList, tlerr.NotSupported(err_str)
-			}
+		if idx == "*" || idx != "0" {
+			err_str := "Subinterfaces not supported"
+			return tblList, tlerr.NotSupported(err_str)
 		}
 
 		if ifName == "*" {
 			_intfTypeList = append(_intfTypeList, IntfTypeEthernet)
-			_addSubIntfToList()
 		} else {
 			_ifType, _, _err := getIntfTypeByName(ifName)
 			if _ifType == IntfTypeUnset || _err != nil {
 				return tblList, errors.New("Invalid interface type IntfTypeUnset")
 			}
 			_intfTypeList = append(_intfTypeList, _ifType)
-			_addSubIntfToList()
 		}
 
 		for _, _ifType := range _intfTypeList {
@@ -2197,7 +2192,7 @@ var Subscribe_intf_ip_addr_xfmr = func(inParams XfmrSubscInParams) (XfmrSubscOut
 				}
 			} else {
 				err_str := "Subinterfaces not supported"
-				return XfmrSubscOutParams, tlerr.NotSupported(err_str)
+				return result, tlerr.NotSupported(err_str)
 			}
 		}
 
