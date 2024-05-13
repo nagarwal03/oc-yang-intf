@@ -22,13 +22,12 @@
 package transformer_test
 
 import (
-	"github.com/Azure/sonic-mgmt-common/translib/db"
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
 	"testing"
 	"time"
 )
 
-func Test_openconfig_interfaces(t *testing.T) {
+func Test_openconfig_portchannel(t *testing.T) {
 	var url, url_input_body_json string
 
 	t.Log("\n\n+++++++++++++ CONFIGURING PORTCHANNEL ++++++++++++")
@@ -36,14 +35,13 @@ func Test_openconfig_interfaces(t *testing.T) {
 	t.Log("\n\n--- PUT to Create PortChannel 111 ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]"
 	url_input_body_json = "{\"name\": \"PortChannel111\", \"config\": {\"name\": \"PortChannel111\", \"mtu\": 9100, \"description\": \"put_pc\", \"enabled\": true}, \"openconfig-if-aggregate:aggregation\": {\"config\": {\"min-links\": 1}}}"
-	t.Run("Test Create PortChannel111", processSetRequest(url, url_body_json, "PUT", false, nil))
+	t.Run("Test Create PortChannel111", processSetRequest(url, url_input_body_json, "PUT", false, nil))
 	time.Sleep(1 * time.Second)
-
 
 	t.Log("\n\n--- Initialize PortChannel Member ---")
 	t.Log("\n\n--- DELETE interface IP Addr ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/subinterfaces/subinterface[index=0]/openconfig-if-ip:ipv4/addresses"
-	t.Run("Verify DELETE on interface IP Addr", processDeleteRequest(url, true))
+	t.Run("DELETE on interface IP Addr", processDeleteRequest(url, true))
 	time.Sleep(1 * time.Second)
 
 	t.Log("\n\n--- PATCH to Add PortChannel Member ---")
@@ -52,8 +50,55 @@ func Test_openconfig_interfaces(t *testing.T) {
 	t.Run("Test PATCH on Ethernet aggregate-id", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
 
+	t.Log("\n\n--- Verify the added PortChannel Member ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id"
+	expected_get_json := "{\"openconfig-if-ethernet:config\": {\"openconfig-if-aggregate:aggregate-id\": \"PortChannel111\"}}"
+	t.Run("Test GET on portchannel agg-id", processGetRequest(url, nil, expected_get_json, false))
+	time.Sleep(1 * time.Second)
 
-	/*
+	t.Log("\n\n--- PATCH PortChannel min-links ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/openconfig-if-aggregate:aggregation/config/min-links"
+	url_input_body_json = "{\"openconfig-if-aggregate:min-links\":3}"
+	t.Run("Test PATCH mtu on portchannel", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
+	time.Sleep(1 * time.Second)
+
+	t.Log("\n\n--- Verify PATCH PortChannel config ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/openconfig-if-aggregate:aggregation/config/"
+	expected_get_json = "{\"openconfig-interfaces:config\": {\"min-links\": 3}}"
+	t.Run("Test GET on portchannel config", processGetRequest(url, nil, expected_get_json, false))
+	time.Sleep(1 * time.Second)
+
+	t.Log("\n\n--- DELETE PortChannel min-links ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/openconfig-if-aggregate:aggregation/config/min-links"
+	t.Run("Verify DELETE on PortChannel min-links", processDeleteRequest(url, true))
+	time.Sleep(1 * time.Second)
+
+	t.Log("\n\n--- PATCH PortChannel interface Config ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/config"
+	url_input_body_json = "{\"openconfig-interfaces:config\": { \"mtu\": 8900, \"description\": \"agg_intf_conf\", \"enabled\": false}}"
+	t.Run("Test PATCH PortChannel interface Config", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
+	time.Sleep(1 * time.Second)
+
+	t.Log("\n\n--- Verify PATCH interfaces config ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/config"
+	expected_get_json = "{\"openconfig-interfaces:config\": {\"description\": \"agg_intf_conf\", \"enabled\": false, \"mtu\": 8900, \"name\": \"PortChannel111\"}}"
+	t.Run("Test GET PortChannel interface Config", processGetRequest(url, nil, expected_get_json, false))
+	time.Sleep(1 * time.Second)
+
+	t.Log("\n\n--- DELETE PortChannel interface ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]"
+	t.Run("Test DELETE on PortChannel", processDeleteRequest(url, true))
+	time.Sleep(1 * time.Second)
+
+	t.Log("\n\n--- Verify DELETE at PortChannel Interface ---")
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]"
+	err_str := "Resource not found"
+	expected_err_invalid := tlerr.NotFoundError{Format: err_str}
+	t.Run("Test GET on deleted PortChannel", processGetRequest(url, nil, "", true, expected_err_invalid))
+	time.Sleep(1 * time.Second)
+}
+
+/*
 	Order of operation
 		Create PortChannel
 		Delete IP from Ethernet0 (Delete)
@@ -61,8 +106,8 @@ func Test_openconfig_interfaces(t *testing.T) {
 		Patch, get, delete min-links
 
 		Operation of Interface level (mtu, desc, enabled) with PortChannel instead of Ethernet
-	*/
-
+*/
+/*
 	t.Log("\n\n+++++++++++++ CONFIGURING INTERFACES ATTRIBUTES ++++++++++++")
 	t.Log("\n\n--- PATCH interfaces config---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/config"
@@ -251,4 +296,4 @@ func Test_openconfig_ethernet(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 }
-
+*/
