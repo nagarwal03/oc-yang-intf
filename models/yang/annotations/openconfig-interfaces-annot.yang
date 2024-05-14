@@ -19,6 +19,7 @@ module openconfig-interfaces-annot {
     deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:config {
         deviate add {
             sonic-ext:subtree-transformer "intf_eth_port_config_xfmr";
+            sonic-ext:path-transformer "intf_eth_port_config_path_xfmr";
         }
     }
 
@@ -75,7 +76,7 @@ module openconfig-interfaces-annot {
             sonic-ext:field-name "admin_status";
         }
     }
-    
+	
     deviation /oc-intf:interfaces {
       deviate add {
         sonic-ext:pre-transformer "intf_pre_xfmr";
