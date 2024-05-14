@@ -67,7 +67,7 @@ func Test_openconfig_interfaces(t *testing.T) {
 
 	t.Log("\n\n--- Verify PATCH interface leaf nodes  ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/state"
-	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"enabled\": true, \"mtu\": 9000, \"name\": \"Ethernet0\"}}"
+	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"counters\": {\"in-broadcast-pkts\": \"0\", \"in-discards\": \"0\", \"in-errors\": \"0\", \"in-multicast-pkts\": \"0\", \"in-octets\": \"0\", \"in-pkts\": \"0\", \"in-unicast-pkts\": \"0\", \"out-broadcast-pkts\": \"0\", \"out-discards\": \"0\", \"out-errors\": \"0\", \"out-multicast-pkts\": \"0\", \"out-octets\": \"0\", \"out-pkts\": \"0\", \"out-unicast-pkts\": \"0\"}, \"enabled\": true, \"mtu\": 9000, \"name\": \"Ethernet0\"}}"
 	t.Run("Test GET on interface state", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
 
@@ -125,7 +125,7 @@ func Test_openconfig_interfaces(t *testing.T) {
 
 	t.Log("\n\n--- Verify PATCH interface ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/state"
-	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"enabled\": true, \"mtu\": 9100, \"name\": \"Ethernet0\"}}"
+	expected_get_json = "{\"openconfig-interfaces:state\": { \"admin-status\": \"UP\", \"counters\": {\"in-broadcast-pkts\": \"0\", \"in-discards\": \"0\", \"in-errors\": \"0\", \"in-multicast-pkts\": \"0\", \"in-octets\": \"0\", \"in-pkts\": \"0\", \"in-unicast-pkts\": \"0\", \"out-broadcast-pkts\": \"0\", \"out-discards\": \"0\", \"out-errors\": \"0\", \"out-multicast-pkts\": \"0\", \"out-octets\": \"0\", \"out-pkts\": \"0\", \"out-unicast-pkts\": \"0\"}, \"enabled\": true, \"mtu\": 9100, \"name\": \"Ethernet0\"}}"
 	t.Run("Test GET on interface state", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
 
@@ -149,7 +149,7 @@ func Test_openconfig_ethernet(t *testing.T) {
 
 	cleanuptbl := map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": ""}}
 	unloadDB(db.ApplDB, cleanuptbl)
-	pre_req_map := map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": map[string]interface{}{"admin_status": "up", "autoneg": "on", "mtu": "9100", "speed": "40000"}}}
+	pre_req_map := map[string]interface{}{"PORT_TABLE": map[string]interface{}{"Ethernet0": map[string]interface{}{"admin_status": "up", "autoneg": "on", "mtu": "9100", "speed": "40000", "counters": map[string]interface{}{"in-broadcast-pkts": "0", "in-discards": "0", "in-errors": "0", "in-multicast-pkts": "0", "in-octets": "0", "in-pkts": "0", "in-unicast-pkts": "0", "out-broadcast-pkts": "0", "out-discards": "0", "out-errors": "0", "out-multicast-pkts": "0", "out-octets": "0", "out-pkts": "0", "out-unicast-pkts": "0"}}}}
 	loadDB(db.ApplDB, pre_req_map)
 
 	t.Log("\n\n--- Verify PATCH ethernet ---")
