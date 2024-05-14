@@ -290,7 +290,6 @@ var intf_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string, error) 
 	if (ifName == "*") && (inParams.oper == SUBSCRIBE) {
 		log.Info("intf_table_xfmr * ifName subscribe with targetUriPath ", targetUriPath)
 
-		// need to check if to add subinterface tbl !!!!
 		if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/config") {
 			tblList = append(tblList, "PORT")
 		} else if strings.HasPrefix(targetUriPath, "/openconfig-interfaces:interfaces/interface/state") {
@@ -836,7 +835,7 @@ var Subscribe_intf_eth_port_config_xfmr SubTreeXfmrSubscribe = func(inParams Xfm
 		}
 
 		result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {
-			"PORT": {ifName: {"autoneg": "auto-negotiate", "adv_speeds": "advertised-speed", "link_training": "standalone-link-training", "unreliable_los": "unreliable-los", "speed": "port-speed", "fec": "port-fec"}}}}
+			"PORT": {ifName: {"autoneg": "auto-negotiate", "speed": "port-speed"}}}}
 
 		log.Info("Subscribe_intf_eth_port_config_xfmr: result ", result)
 	}
@@ -1025,11 +1024,6 @@ var intf_subintfs_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string
 		return tblList, nil
 	}
 
-	intfType, _, ierr := getIntfTypeByName(ifName)
-	if intfType == IntfTypeUnset || ierr != nil {
-		return tblList, errors.New("Invalid interface type IntfTypeUnset")
-	}
-
 	log.Info("intf_subintfs_table_xfmr: URI: ", inParams.uri)
 
 	if idx == "" {
@@ -1081,11 +1075,6 @@ var YangToDb_intf_subintfs_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (str
 	}
 
 	idx := pathInfo.Var("index")
-
-	if idx != "" {
-		i64, _ := strconv.ParseUint(idx, 10, 32)
-		i32 = uint32(i64)
-	}
 
 	log.Info("YangToDb_intf_subintfs_xfmr: i32: %s", i32)
 
@@ -2195,28 +2184,6 @@ var Subscribe_intf_ip_addr_xfmr = func(inParams XfmrSubscInParams) (XfmrSubscOut
 				return result, tlerr.NotSupported(err_str)
 			}
 		}
-
-		ipKey = pathInfo.Var("ip")
-		if ipKey == "" {
-			ipKey = "*"
-		}
-
-		if ipKey != "*" {
-			ipKey = ipKey + "/*"
-		}
-
-		log.Infof("path:%v ifKey:%v, ipKey:%v tbl:[%v]", origTargetUriPath, ifKey, ipKey, tableName)
-
-		ipKey = pathInfo.Var("ip")
-		if ipKey == "" {
-			ipKey = "*"
-		}
-
-		if ipKey != "*" {
-			ipKey = ipKey + "/*"
-		}
-
-		log.Infof("path:%v ifKey:%v, ipKey:%v tbl:[%v]", origTargetUriPath, ifKey, ipKey, tableName)
 
 		ipKey = pathInfo.Var("ip")
 		if ipKey == "" {
