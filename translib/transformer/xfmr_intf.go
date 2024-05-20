@@ -38,10 +38,14 @@ import (
 
 func init() {
 	XlateFuncBind("intf_table_xfmr", intf_table_xfmr)
+	XlateFuncBind("YangToDb_intf_name_xfmr", YangToDb_intf_name_xfmr)
+	XlateFuncBind("DbToYang_intf_name_xfmr", DbToYang_intf_name_xfmr)
 	XlateFuncBind("YangToDb_intf_tbl_key_xfmr", YangToDb_intf_tbl_key_xfmr)
 	XlateFuncBind("DbToYang_intf_tbl_key_xfmr", DbToYang_intf_tbl_key_xfmr)
 	XlateFuncBind("YangToDb_intf_mtu_xfmr", YangToDb_intf_mtu_xfmr)
 	XlateFuncBind("DbToYang_intf_mtu_xfmr", DbToYang_intf_mtu_xfmr)
+	XlateFuncBind("YangToDb_intf_type_xfmr", YangToDb_intf_type_xfmr)
+	XlateFuncBind("DbToYang_intf_type_xfmr", DbToYang_intf_type_xfmr)
 	XlateFuncBind("DbToYang_intf_admin_status_xfmr", DbToYang_intf_admin_status_xfmr)
 	XlateFuncBind("YangToDb_intf_enabled_xfmr", YangToDb_intf_enabled_xfmr)
 	XlateFuncBind("DbToYang_intf_enabled_xfmr", DbToYang_intf_enabled_xfmr)
@@ -61,6 +65,7 @@ func init() {
 	XlateFuncBind("intf_subintfs_table_xfmr", intf_subintfs_table_xfmr)
 	XlateFuncBind("YangToDb_subif_index_xfmr", YangToDb_subif_index_xfmr)
 	XlateFuncBind("DbToYang_subif_index_xfmr", DbToYang_subif_index_xfmr)
+	XlateFuncBind("DbToYangPath_intf_ip_path_xfmr", DbToYangPath_intf_ip_path_xfmr)
 	XlateFuncBind("Subscribe_intf_ip_addr_xfmr", Subscribe_intf_ip_addr_xfmr)
 
 	XlateFuncBind("YangToDb_subintf_ipv6_tbl_key_xfmr", YangToDb_subintf_ipv6_tbl_key_xfmr)
@@ -141,6 +146,11 @@ type E_InterfaceSubType int64
 const (
 	IntfSubTypeUnset E_InterfaceSubType = 0
 )
+
+var IF_TYPE_MAP = map[E_InterfaceType]ocbinds.E_IETFInterfaces_InterfaceType{
+	IntfTypeUnset:    ocbinds.IETFInterfaces_InterfaceType_UNSET,
+	IntfTypeEthernet: ocbinds.IETFInterfaces_InterfaceType_ethernetCsmacd,
+}
 
 func getIntfTypeByName(name string) (E_InterfaceType, E_InterfaceSubType, error) {
 
@@ -355,6 +365,92 @@ var intf_table_xfmr TableXfmrFunc = func(inParams XfmrParams) ([]string, error) 
 	}
 
 	return tblList, err
+}
+var YangToDb_intf_name_xfmr FieldXfmrYangToDb = func(inParams XfmrParams) (map[string]string, error) {
+	res_map := make(map[string]string)
+	var err error
+
+	pathInfo := NewPathInfo(inParams.uri)
+	//uriIfName := pathInfo.Var("name")
+	ifName := pathInfo.Var("name")
+
+	//ifName := *utils.GetNativeNameFromUIName(&uriIfName)
+	if strings.HasPrefix(ifName, ETHERNET) {
+		res_map["NULL"] = "NULL"
+	}
+	log.Info("YangToDb_intf_name_xfmr: res_map:", res_map)
+	return res_map, err
+}
+
+var DbToYang_intf_name_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+	res_map := make(map[string]interface{})
+
+	pathInfo := NewPathInfo(inParams.uri)
+	ifName := pathInfo.Var("name")
+	log.Info("DbToYang_intf_name_xfmr: Interface Name = ", ifName)
+	res_map["name"] = ifName
+	return res_map, nil
+}
+
+var YangToDb_intf_type_xfmr FieldXfmrYangToDb = func(inParams XfmrParams) (map[string]string, error) {
+	res_map := make(map[string]string)
+	intfsObj := getIntfsRoot(inParams.ygRoot)
+	if intfsObj == nil || len(intfsObj.Interface) < 1 {
+		log.Info("YangToDb_intf_type_xfmr: IntfsObj/interface list is empty.")
+		return res_map, errors.New("IntfsObj/Interface is not specified")
+	}
+	if inParams.oper == DELETE {
+		return res_map, tlerr.NotSupported("Operation Not Supported")
+	}
+	if inParams.param == nil {
+		return res_map, nil
+	}
+	pathInfo := NewPathInfo(inParams.uri)
+	ifName := pathInfo.Var("name")
+	if ifName == "" {
+		errStr := "YangToDb_intf_type_xfmr: Interface KEY not present"
+		log.Info(errStr)
+		return res_map, errors.New(errStr)
+	}
+
+	errStr := "YangToDb_intf_type_xfmr: Interface type not found, ifname: " + ifName
+	intfType, _, ierr := getIntfTypeByName(ifName)
+	if ierr != nil {
+		return res_map, tlerr.InvalidArgsError{Format: errStr}
+	}
+
+	intfTypeVal, _ := inParams.param.(ocbinds.E_IETFInterfaces_InterfaceType)
+	if val, ok := IF_TYPE_MAP[intfType]; ok {
+		//Check if intfTypeVal valid for given interface
+		if intfTypeVal == val {
+			return res_map, nil
+		}
+	}
+	errStr = "YangToDb_intf_type_xfmr: Invalid Interface type provided for ifname: " + ifName
+	return res_map, tlerr.InvalidArgsError{Format: errStr}
+}
+
+var DbToYang_intf_type_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+	res_map := make(map[string]interface{})
+	pathInfo := NewPathInfo(inParams.uri)
+	ifName := pathInfo.Var("name")
+	if ifName == "" {
+		errStr := "Interface KEY not present"
+		log.Info("DbToYang_intf_type_xfmr : " + errStr)
+		return res_map, errors.New(errStr)
+	}
+	errStr := "DbToYang_intf_type_xfmr: Interface type not found, ifname: " + ifName
+	intfType, _, ierr := getIntfTypeByName(ifName)
+	if ierr != nil {
+		return res_map, errors.New(errStr)
+	}
+	if val, ok := IF_TYPE_MAP[intfType]; ok {
+		intfTypeStr := ocbinds.E_IETFInterfaces_InterfaceType.ΛMap(val)["E_IETFInterfaces_InterfaceType"][int64(val)].Name
+		log.Infof("DbToYang_intf_type_xfmr, Interface: %s type:%s.", ifName, intfTypeStr)
+		res_map["type"] = intfTypeStr
+		return res_map, nil
+	}
+	return res_map, errors.New(errStr)
 }
 
 var YangToDb_intf_tbl_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
@@ -707,7 +803,11 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 	intfsObj := getIntfsRoot(inParams.ygRoot)
 	pathInfo := NewPathInfo(inParams.uri)
 	uriIfName := pathInfo.Var("name")
-	ifName := uriIfName
+	ifName := uriIfName //NDA rewrite
+
+	sonicIfName := &uriIfName
+	log.Infof("DbToYang_intf_eth_port_config_xfmr: Interface name retrieved from alias : %s is %s", ifName, *sonicIfName)
+	ifName = *sonicIfName
 
 	intfType, _, err := getIntfTypeByName(ifName)
 	if err != nil {
@@ -1400,7 +1500,7 @@ var DbToYang_intf_ip_addr_xfmr SubTreeXfmrDbToYang = func(inParams XfmrParams) e
 			handleAllIntfIPGetForTable(inParams, intfTbl.cfgDb.intfTN, false)
 		}
 
-		// Get IP from applDb INTF_TABLE interfaces except vlan intf
+		// Get IP from applDb INTF_TABLE interfaces
 		handleAllIntfIPGetForTable(inParams, "INTF_TABLE", true)
 
 		inParams.txCache.Store("interface_subinterface_ip_read_once", true)
@@ -1999,6 +2099,48 @@ func check_if_delete_l3_intf_entry(d *db.DB, tblName string, ifName string, ipCn
 		}
 	}
 	return false
+}
+
+var DbToYangPath_intf_ip_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
+	ifRoot := "/openconfig-interfaces:interfaces/interface"
+	subIf := ifRoot + "/subinterfaces/subinterface"
+	//routedVlan := ifRoot + "/openconfig-vlan:routed-vlan"
+	dbKey := ""
+
+	log.Info("DbToYangPath_intf_ip_path_xfmr: params: ", params)
+
+	//uiName := utils.GetUINameFromNativeName(&params.tblKeyComp[0])
+	uiName := &params.tblKeyComp[0]
+	ifParts := strings.Split(*uiName, ".") //NDA remove
+
+	params.ygPathKeys[ifRoot+"/name"] = ifParts[0] //NDA remove
+
+	if params.tblName == "INTERFACE" || params.tblName == "INTF_TABLE" {
+
+		addrPath := "/openconfig-if-ip:ipv4/addresses/address/ip"
+
+		/* For APPL_DB IPv6 case, addr is split [fe80  56bf 64ff feba 3bc0/64] instead of
+		   [fe80::56bf:64ff:feba:3bc0/64]
+		   Handle this case
+		*/
+		dbKey = strings.Join(params.tblKeyComp[1:], ":")
+
+		if len(params.tblKeyComp) > 2 || strings.Contains(dbKey, ":") {
+			addrPath = "/openconfig-if-ip:ipv6/addresses/address/ip"
+		}
+
+		ipKey := strings.Split(dbKey, "/")
+
+		if len(ifParts) > 1 { //Remove entire if else NDA  or return error?
+			params.ygPathKeys[subIf+"/index"] = ifParts[1]
+		} else {
+			params.ygPathKeys[subIf+"/index"] = "0" //keep for subintf index 0
+		}
+		params.ygPathKeys[subIf+addrPath] = ipKey[0] //NDA keep
+	}
+
+	log.Infof("DbToYangPath_intf_ip_path_xfmr:  tblName:%v dbKey:[%v] params.ygPathKeys: %v", params.tblName, dbKey, params.ygPathKeys)
+	return nil
 }
 
 var Subscribe_intf_ip_addr_xfmr = func(inParams XfmrSubscInParams) (XfmrSubscOutParams, error) {

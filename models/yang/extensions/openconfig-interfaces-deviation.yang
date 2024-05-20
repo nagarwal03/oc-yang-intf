@@ -41,10 +41,6 @@ module openconfig-interfaces-deviation {
     deviate not-supported;
   }    
 
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:config/oc-intf:type {
-    deviate not-supported;
-  }   
-
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:loopback-mode {
     deviate not-supported;
   }    
@@ -60,10 +56,6 @@ module openconfig-interfaces-deviation {
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:counters {
     deviate not-supported;
   }    
-
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:type {
-    deviate not-supported;
-  }   
 
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:ifindex {
     deviate not-supported;
