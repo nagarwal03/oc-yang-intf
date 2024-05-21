@@ -803,7 +803,7 @@ var DbToYang_intf_eth_port_config_xfmr SubTreeXfmrDbToYang = func(inParams XfmrP
 	intfsObj := getIntfsRoot(inParams.ygRoot)
 	pathInfo := NewPathInfo(inParams.uri)
 	uriIfName := pathInfo.Var("name")
-	ifName := uriIfName //NDA rewrite
+	ifName := *(&uriIfName)
 
 	sonicIfName := &uriIfName
 	log.Infof("DbToYang_intf_eth_port_config_xfmr: Interface name retrieved from alias : %s is %s", ifName, *sonicIfName)
@@ -2104,12 +2104,10 @@ func check_if_delete_l3_intf_entry(d *db.DB, tblName string, ifName string, ipCn
 var DbToYangPath_intf_ip_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
 	ifRoot := "/openconfig-interfaces:interfaces/interface"
 	subIf := ifRoot + "/subinterfaces/subinterface"
-	//routedVlan := ifRoot + "/openconfig-vlan:routed-vlan"
 	dbKey := ""
 
 	log.Info("DbToYangPath_intf_ip_path_xfmr: params: ", params)
 
-	//uiName := utils.GetUINameFromNativeName(&params.tblKeyComp[0])
 	uiName := &params.tblKeyComp[0]
 	ifParts := strings.Split(*uiName, ".") //NDA remove
 
