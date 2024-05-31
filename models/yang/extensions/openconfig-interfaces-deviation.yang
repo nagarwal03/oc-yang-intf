@@ -55,11 +55,7 @@ module openconfig-interfaces-deviation {
 
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:last-change {
     deviate not-supported;
-  }    
-
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:counters {
-    deviate not-supported;
-  }    
+  }       
 
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:type {
     deviate not-supported;
@@ -76,6 +72,22 @@ module openconfig-interfaces-deviation {
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-vlan:tpid {
     deviate not-supported;
   }   
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:counters/oc-intf:in-unknown-protos {
+    deviate not-supported;
+  }   
+  
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:counters/oc-intf:in-fcs-errors {
+    deviate not-supported;
+  }   
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:counters/oc-intf:carrier-transitions {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:state/oc-intf:counters/oc-intf:last-clear {
+    deviate not-supported;
+  }
 
   deviation /oc-intf:interfaces/oc-intf:interface/oc-intf:hold-time {
     deviate not-supported;
@@ -223,10 +235,6 @@ module openconfig-interfaces-deviation {
     deviate not-supported;
   }
 
-  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters {
-    deviate not-supported;
-  }
-
   deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:hw-mac-address {
     deviate not-supported;
   }
@@ -260,6 +268,42 @@ module openconfig-interfaces-deviation {
   }
 
   deviation /oc-intf:interfaces/oc-intf:interface/oc-lag:aggregation/oc-lag:state/oc-lag:member {
+        deviate not-supported;
+  }
+  
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:in-mac-control-frames {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:in-mac-pause-frames {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:in-8021q-frames {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:in-crc-errors {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:in-block-errors {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:out-mac-control-frames {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:out-mac-pause-frames {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-eth:state/oc-eth:counters/oc-eth:out-8021q-frames {
+    deviate not-supported;
+  }
+
+  deviation /oc-intf:interfaces/oc-intf:interface/oc-eth:ethernet/oc-vlan:switched-vlan {
     deviate not-supported;
   }
 
