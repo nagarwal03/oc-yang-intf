@@ -95,13 +95,6 @@ const (
 	COLON       = ":"
 	ETHERNET    = "Eth"
 	PORTCHANNEL = "PortChannel"
-	DEFAULT_MTU = "9100"
-)
-
-const (
-	PIPE     = "|"
-	COLON    = ":"
-	ETHERNET = "Eth"
 )
 
 type TblData struct {
@@ -263,6 +256,31 @@ func performIfNameKeyXfmrOp(inParams *XfmrParams, requestUriPath *string, ifName
 		}
 	}
 	return err
+}
+
+/* Validate interface in L3 mode, if true return error */
+func validateL3ConfigExists(d *db.DB, ifName *string) error {
+	intfType, _, ierr := getIntfTypeByName(*ifName)
+	if intfType == IntfTypeUnset || ierr != nil {
+		return errors.New("Invalid interface type IntfTypeUnset")
+	}
+	intTbl := IntfTypeTblMap[intfType]
+	IntfMapObj, err := d.GetEntry(&db.TableSpec{Name: intTbl.cfgDb.intfTN}, db.Key{Comp: []string{*ifName}})
+	if err == nil && IntfMapObj.IsPopulated() {
+		errStr := "L3 Configuration exists for Interface: " + *ifName
+
+		// L3 config exists if interface in interface table
+		return tlerr.InvalidArgsError{Format: errStr}
+	}
+	return nil
+}
+
+func processIntfTableRemoval(d *db.DB, ifName string, tblName string, intfMap map[string]db.Value) {
+	intfKey, _ := d.GetKeysByPattern(&db.TableSpec{Name: tblName}, "*"+ifName)
+	if len(intfKey) != 0 {
+		key := ifName
+		intfMap[key] = db.Value{Field: map[string]string{}}
+	}
 }
 
 /* Validate whether intf exists in DB */
