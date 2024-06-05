@@ -34,7 +34,7 @@ func Test_openconfig_portchannel(t *testing.T) {
 
 	t.Log("\n\n--- PUT to Create PortChannel 111 ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]"
-	url_input_body_json = "{\"name\": \"PortChannel111\", \"config\": {\"name\": \"PortChannel111\", \"mtu\": 9100, \"description\": \"put_pc\", \"enabled\": true}, \"openconfig-if-aggregate:aggregation\": {\"config\": {\"min-links\": 1}}}"
+	url_input_body_json = "{\"openconfig-interfaces:interface\": [{\"name\":\"PortChannel111\", \"config\": {\"name\": \"PortChannel111\", \"mtu\": 9100, \"description\": \"put_pc\", \"enabled\": true}}]}"
 	t.Run("Test Create PortChannel111", processSetRequest(url, url_input_body_json, "PUT", false, nil))
 	time.Sleep(1 * time.Second)
 
@@ -52,19 +52,19 @@ func Test_openconfig_portchannel(t *testing.T) {
 
 	t.Log("\n\n--- Verify the added PortChannel Member ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Ethernet0]/openconfig-if-ethernet:ethernet/config/openconfig-if-aggregate:aggregate-id"
-	expected_get_json := "{\"openconfig-if-ethernet:config\": {\"openconfig-if-aggregate:aggregate-id\": \"PortChannel111\"}}"
+	expected_get_json := "{\"openconfig-if-aggregate:aggregate-id\": \"PortChannel111\"}"
 	t.Run("Test GET on portchannel agg-id", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
 
 	t.Log("\n\n--- PATCH PortChannel min-links ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/openconfig-if-aggregate:aggregation/config/min-links"
 	url_input_body_json = "{\"openconfig-if-aggregate:min-links\":3}"
-	t.Run("Test PATCH mtu on portchannel", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
+	t.Run("Test PATCH min-links on portchannel", processSetRequest(url, url_input_body_json, "PATCH", false, nil))
 	time.Sleep(1 * time.Second)
 
 	t.Log("\n\n--- Verify PATCH PortChannel config ---")
-	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/openconfig-if-aggregate:aggregation/config/"
-	expected_get_json = "{\"openconfig-interfaces:config\": {\"min-links\": 3}}"
+	url = "/openconfig-interfaces:interfaces/interface[name=PortChannel111]/openconfig-if-aggregate:aggregation/config"
+	expected_get_json = "{\"openconfig-if-aggregate:config\": {\"min-links\": 3}}"
 	t.Run("Test GET on portchannel config", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
 

@@ -36,8 +36,8 @@ func init() {
 	XlateFuncBind("YangToDb_lag_min_links_xfmr", YangToDb_lag_min_links_xfmr)
 	XlateFuncBind("DbToYang_lag_min_links_xfmr", DbToYang_lag_min_links_xfmr)
 	XlateFuncBind("DbToYang_intf_lag_state_xfmr", DbToYang_intf_lag_state_xfmr)
-	//	XlateFuncBind("Subscribe_intf_lag_state_xfmr", Subscribe_intf_lag_state_xfmr)
-	//  XlateFuncBind("DbToYangPath_intf_lag_state_path_xfmr", DbToYangPath_intf_lag_state_path_xfmr)
+	XlateFuncBind("Subscribe_intf_lag_state_xfmr", Subscribe_intf_lag_state_xfmr)
+	XlateFuncBind("DbToYangPath_intf_lag_state_path_xfmr", DbToYangPath_intf_lag_state_path_xfmr)
 }
 
 const (
@@ -460,4 +460,72 @@ func updateMemberPortsMtu(inParams *XfmrParams, lagName *string, mtuValStr *stri
 		inParams.subOpDataMap[UPDATE] = &subOpMap
 	}
 	return err
+}
+
+var Subscribe_intf_lag_state_xfmr SubTreeXfmrSubscribe = func(inParams XfmrSubscInParams) (XfmrSubscOutParams, error) {
+	var err error
+	var result XfmrSubscOutParams
+
+	if inParams.subscProc == TRANSLATE_SUBSCRIBE {
+
+		log.Info("Subscribe_intf_lag_state_xfmr: inParams.subscProc: ", inParams.subscProc)
+
+		pathInfo := NewPathInfo(inParams.uri)
+		targetUriPath := pathInfo.YangPath
+
+		log.Infof("Subscribe_intf_lag_state_xfmr:- URI:%s pathinfo:%s ", inParams.uri, pathInfo.Path)
+		log.Infof("Subscribe_intf_lag_state_xfmr:- Target URI path:%s", targetUriPath)
+
+		result.nOpts = new(notificationOpts)
+		result.nOpts.pType = OnChange
+		result.nOpts.mInterval = 15
+		result.isVirtualTbl = false
+		result.needCache = true
+
+		ifName := pathInfo.Var("name")
+		log.Info("Subscribe_intf_lag_state_xfmr: ifName: ", ifName)
+
+		// for PORTCHANNEL_MEMBER table
+		po_mem_key := "*" + "|" + "*"
+
+		if ifName == "" {
+			ifName = "*"
+		} else if ifName != "*" {
+			po_mem_key = ifName + "|" + "*"
+		}
+
+		result.secDbDataMap = RedisDbYgNodeMap{db.ConfigDB: {
+			"PORTCHANNEL_MEMBER": {po_mem_key: DBKeyYgNodeInfo{nodeName: "member", keyGroup: []int{0}}},
+			"PORTCHANNEL":        {ifName: map[string]string{"min_links": "min-links"}}}}
+		log.Info("Subscribe_intf_lag_state_xfmr: result ", result)
+	}
+
+	return result, err
+}
+
+var DbToYangPath_intf_lag_state_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
+	intfRoot := "/openconfig-interfaces:interfaces/interface"
+
+	//LAG_TABLE NOT NEEDED?
+	if (params.tblName != "PORTCHANNEL") &&
+		(params.tblName != "PORTCHANNEL_MEMBER") &&
+		(params.tblName != "LAG_TABLE") {
+		log.Info("DbToYangPath_intf_lag_state_path_xfmr: from wrong table ", params.tblName)
+		return nil
+	}
+
+	if (params.tblName == "PORTCHANNEL") && (len(params.tblKeyComp) > 0) {
+		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
+	} else if (params.tblName == "PORTCHANNEL_MEMBER") && (len(params.tblKeyComp) > 1) {
+		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
+	} else if (params.tblName == "LAG_TABLE") && (len(params.tblKeyComp) > 0) {
+		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
+	} else {
+		log.Info("DbToYangPath_intf_lag_state_path_xfmr, wrong param: tbl ", params.tblName, " key ", params.tblKeyComp)
+		return nil
+	}
+
+	log.Info("DbToYangPath_intf_lag_state_path_xfmr: params.ygPathkeys: ", params.ygPathKeys)
+
+	return nil
 }
