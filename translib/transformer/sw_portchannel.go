@@ -18,16 +18,13 @@
 package transformer
 
 import (
-	//"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
-	//"time"
 
 	"github.com/Azure/sonic-mgmt-common/translib/db"
 	"github.com/Azure/sonic-mgmt-common/translib/ocbinds"
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
-	//"github.com/Azure/sonic-mgmt-common/translib/utils"
 	log "github.com/golang/glog"
 	"github.com/openconfig/ygot/ygot"
 )
@@ -191,9 +188,7 @@ func fillLagInfoForIntf(inParams XfmrParams, d *db.DB, ifName *string, lagInfoMa
 		memberPortsStr.WriteString(ethName + ",")
 	}
 	lagInfoMap[*ifName] = db.Value{Field: make(map[string]string)}
-	//if len(lagMembers) > 0 {
-	//	lagInfoMap[*ifName].Field["member@"] = strings.Join(lagMembers, ",")
-	//}
+
 	/* Get MinLinks value */
 	curr, err := d.GetEntry(&db.TableSpec{Name: intTbl.cfgDb.portTN}, db.Key{Comp: []string{*ifName}})
 	if err != nil {
@@ -218,34 +213,6 @@ func fillLagInfoForIntf(inParams XfmrParams, d *db.DB, ifName *string, lagInfoMa
 		links = min_links
 	}
 	lagInfoMap[*ifName].Field["min-links"] = strconv.Itoa(links)
-
-	/*Get Static Value*/
-	//if v, k := curr.Field["static"]; k {
-	//	lagInfoMap[*ifName].Field["static"] = v
-	//} else {
-	//	log.V(3).Info("Mode set to LACP, default value")
-	//	lagInfoMap[*ifName].Field["static"] = "false"
-	//}
-
-	/* Get gshut mode value */
-	//var gshutModeVal string
-	//if val, ok := curr.Field["graceful_shutdown_mode"]; ok {
-	//	gshutModeVal = val
-	//} else {
-	//	if log.V(3) {
-	//		log.Info("gshutMode set to false (default value)")
-	//	}
-	//	gshutModeVal = "DISABLE"
-	//}
-	//lagInfoMap[*ifName].Field["graceful_shutdown_mode"] = gshutModeVal
-
-	/*Get system_mac Value*/
-	//if v, k := curr.Field["system_mac"]; k {
-	//	lagInfoMap[*ifName].Field["system_mac"] = v
-	//} else {
-	//	log.V(3).Info("No value is set")
-	//	lagInfoMap[*ifName].Field["system_mac"] = ""
-	//}
 
 	log.Infof("Updated the lag-info-map for Interface: %s", *ifName)
 
@@ -373,54 +340,11 @@ var DbToYang_intf_lag_state_xfmr SubTreeXfmrDbToYang = func(inParams XfmrParams)
 		if err != nil {
 			return err
 		}
-	case "/openconfig-interfaces:interfaces/interface/openconfig-if-aggregate:aggregation/state/lag-type":
-		log.Info("Get is for lag type")
-		attr := "mode"
-		err = getLagStateAttr(&attr, &ifName, lagInfoMap, ocAggregationStateVal)
-		if err != nil {
-			return err
-		}
-	case "/openconfig-interfaces:interfaces/interface/openconfig-if-aggregate:aggregation/state/member":
-		log.Info("Get is for member")
-		attr := "member"
-		err = getLagStateAttr(&attr, &ifName, lagInfoMap, ocAggregationStateVal)
-		if err != nil {
-			return err
-		}
 	case "/openconfig-interfaces:interfaces/interface/aggregation/state":
 		fallthrough
 	case "/openconfig-interfaces:interfaces/interface/openconfig-if-aggregate:aggregation/state":
 		log.Info("Get is for State Container!")
 		err = getLagState(inParams, inParams.d, &ifName, lagInfoMap, ocAggregationStateVal)
-		if err != nil {
-			return err
-		}
-	case "/openconfig-interfaces:interfaces/interface/openconfig-if-aggregate:aggregation/state/openconfig-interfaces-ext:reason":
-		log.Info("Get is for PO reason!")
-
-		attr := "reason"
-		err = getLagStateAttr(&attr, &ifName, lagInfoMap, ocAggregationStateVal)
-		if err != nil {
-			return err
-		}
-	case "/openconfig-interfaces:interfaces/interface/openconfig-if-aggregate:aggregation/state/graceful-shutdown-mode":
-		log.Info("Get is for graceful-shutdown-mode")
-		attr := "graceful-shutdown-mode"
-		err = getLagStateAttr(&attr, &ifName, lagInfoMap, ocAggregationStateVal)
-		if err != nil {
-			return err
-		}
-	case "/openconfig-interfaces:interfaces/interface/openconfig-if-aggregate:aggregation/state/lag-speed":
-		log.Info("Get is for lag-speed")
-		attr := "lag-speed"
-		err = getLagStateAttr(&attr, &ifName, lagInfoMap, ocAggregationStateVal)
-		if err != nil {
-			return err
-		}
-	case "/openconfig-interfaces:interfaces/interface/openconfig-if-aggregate:aggregation/state/system-mac":
-		log.Info("Get is for system-mac")
-		attr := "system-mac"
-		err = getLagStateAttr(&attr, &ifName, lagInfoMap, ocAggregationStateVal)
 		if err != nil {
 			return err
 		}
@@ -495,7 +419,7 @@ var Subscribe_intf_lag_state_xfmr SubTreeXfmrSubscribe = func(inParams XfmrSubsc
 		}
 
 		result.secDbDataMap = RedisDbYgNodeMap{db.ConfigDB: {
-			"PORTCHANNEL_MEMBER": {po_mem_key: DBKeyYgNodeInfo{nodeName: "member", keyGroup: []int{0}}},
+			"PORTCHANNEL_MEMBER": {po_mem_key: DBKeyYgNodeInfo{}},
 			"PORTCHANNEL":        {ifName: map[string]string{"min_links": "min-links"}}}}
 		log.Info("Subscribe_intf_lag_state_xfmr: result ", result)
 	}
@@ -506,10 +430,8 @@ var Subscribe_intf_lag_state_xfmr SubTreeXfmrSubscribe = func(inParams XfmrSubsc
 var DbToYangPath_intf_lag_state_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYgPathParams) error {
 	intfRoot := "/openconfig-interfaces:interfaces/interface"
 
-	//LAG_TABLE NOT NEEDED?
 	if (params.tblName != "PORTCHANNEL") &&
-		(params.tblName != "PORTCHANNEL_MEMBER") &&
-		(params.tblName != "LAG_TABLE") {
+		(params.tblName != "PORTCHANNEL_MEMBER") {
 		log.Info("DbToYangPath_intf_lag_state_path_xfmr: from wrong table ", params.tblName)
 		return nil
 	}
@@ -517,8 +439,6 @@ var DbToYangPath_intf_lag_state_path_xfmr PathXfmrDbToYangFunc = func(params Xfm
 	if (params.tblName == "PORTCHANNEL") && (len(params.tblKeyComp) > 0) {
 		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
 	} else if (params.tblName == "PORTCHANNEL_MEMBER") && (len(params.tblKeyComp) > 1) {
-		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
-	} else if (params.tblName == "LAG_TABLE") && (len(params.tblKeyComp) > 0) {
 		params.ygPathKeys[intfRoot+"/name"] = params.tblKeyComp[0]
 	} else {
 		log.Info("DbToYangPath_intf_lag_state_path_xfmr, wrong param: tbl ", params.tblName, " key ", params.tblKeyComp)

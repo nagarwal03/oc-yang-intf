@@ -2833,7 +2833,8 @@ var Subscribe_intf_ip_addr_xfmr = func(inParams XfmrSubscInParams) (XfmrSubscOut
 			if tableName != "" {
 				result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {tableName: {keyName: {}}}}
 			} else {
-				result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {"INTERFACE": {keyName: {}}}}
+				result.dbDataMap = RedisDbSubscribeMap{db.ConfigDB: {"INTERFACE": {keyName: {}},
+					"PORTCHANNEL_INTERFACE": {keyName: {}}}}
 			}
 		} else if targetUriPath == addressStatePath {
 			keyName = ifKey + ":" + ipKey
@@ -2888,7 +2889,8 @@ var DbToYangPath_intf_ip_path_xfmr PathXfmrDbToYangFunc = func(params XfmrDbToYg
 
 	params.ygPathKeys[ifRoot+"/name"] = ifParts[0]
 
-	if params.tblName == "INTERFACE" || params.tblName == "INTF_TABLE" {
+	if params.tblName == "INTERFACE" || params.tblName == "INTF_TABLE" ||
+		params.tblName == "PORTCHANNEL_INTERFACE" {
 
 		addrPath := "/openconfig-if-ip:ipv4/addresses/address/ip"
 
